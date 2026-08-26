@@ -31,22 +31,26 @@ class TestResponse(BaseModel):
     stored: bool
 
 
-@lru_cache(maxsize=1)
-def get_supabase_client() -> Any:
-    """Create one reusable Supabase client from the existing Render variables."""
+@lru_cache(maxsize=2)
+def get_supabase_client(require_write: bool = False) -> Any:
+    """Create a reusable Supabase client from the existing Render variables."""
     url = os.getenv("SUPABASE_URL")
-    key = (
-        os.getenv("SUPABASE_SECRET_KEY")
-        or os.getenv("SUPABASE_SERVICE_KEY")
+    write_key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+    read_key = (
+        write_key
         or os.getenv("SUPABASE_PUBLISHABLE_KEY")
         or os.getenv("SUPABASE_ANON_KEY")
         or os.getenv("SUPABASE_KEY")
     )
+    key = write_key if require_write else read_key
 
     if not url or not key:
-        raise RuntimeError(
-            "SUPABASE_URL and a Supabase secret or publishable key must be configured."
-        )
+        if require_write:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_SECRET_KEY or SUPABASE_SERVICE_KEY "
+                "must be configured for database writes."
+            )
+        raise RuntimeError("SUPABASE_URL and a Supabase key must be configured.")
 
     from supabase import create_client
 
@@ -62,7 +66,7 @@ def store_api_result(
     status_code: int,
     error_message: str | None = None,
 ) -> None:
-    get_supabase_client().table(RESULTS_TABLE).insert(
+    get_supabase_client(require_write=True).table(RESULTS_TABLE).insert(
         {
             "endpoint": endpoint,
             "method": method,
@@ -76,8 +80,8 @@ def store_api_result(
 
 app = FastAPI(
     title="MeteorBase API",
-    description="A FastAPI service connected to the existing Supabase project.",
-    version="1.1.0",
+    description="A FastAPI service connected to the Ayush MeteorAPI Supabase project.",
+    version="1.2.0",
 )
 
 
@@ -101,7 +105,11 @@ def healthz() -> dict[str, str]:
 
 @app.get("/readyz", tags=["system"])
 def readyz() -> dict[str, Any]:
-    configured = bool(
+    write_key_configured = bool(
+        os.getenv("SUPABASE_URL")
+        and (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY"))
+    )
+    read_key_configured = bool(
         os.getenv("SUPABASE_URL")
         and (
             os.getenv("SUPABASE_SECRET_KEY")
@@ -113,8 +121,9 @@ def readyz() -> dict[str, Any]:
     )
     return {
         "service": SERVICE_NAME,
-        "status": "ready" if configured else "not_ready",
-        "supabase_configured": configured,
+        "status": "ready" if write_key_configured else "not_ready",
+        "supabase_configured": read_key_configured,
+        "supabase_write_key_configured": write_key_configured,
         "tables": {"services": SERVICES_TABLE, "results": RESULTS_TABLE},
     }
 
@@ -138,7 +147,11 @@ def test_get() -> TestResponse:
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="Supabase is unavailable for result storage.",
+            detail=(
+                "Supabase result storage failed. Set the destination project's "
+                "secret/service key in Render as SUPABASE_SECRET_KEY or "
+                "SUPABASE_SERVICE_KEY."
+            ),
         ) from exc
 
     return TestResponse(**response, stored=True)
@@ -163,7 +176,11 @@ def test_post(payload: TestRequest) -> TestResponse:
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="Supabase is unavailable for result storage.",
+            detail=(
+                "Supabase result storage failed. Set the destination project's "
+                "secret/service key in Render as SUPABASE_SECRET_KEY or "
+                "SUPABASE_SERVICE_KEY."
+            ),
         ) from exc
 
     return TestResponse(**response, stored=True)
