@@ -10,13 +10,13 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.11
       - key: SUPABASE_URL
-        value: https://qdsdjgfvimuvdujxouab.supabase.co
+        value: https://xkfvqqatcbjgcrkvxmcu.supabase.co
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
       - key: SUPABASE_JWKS_URL
-        value: https://qdsdjgfvimuvdujxouab.supabase.co/auth/v1/.well-known/jwks.json
+        value: https://xkfvqqatcbjgcrkvxmcu.supabase.co/auth/v1/.well-known/jwks.json
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_KEY
