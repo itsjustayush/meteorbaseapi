@@ -10,12 +10,14 @@ except ImportError:  # Local smoke tests may run without optional dotenv support
     def load_dotenv() -> bool:
         return False
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 load_dotenv()
 
 SERVICE_NAME = "meteorbase"
+RESULTS_TABLE = "meteorbase_api_results"
+SERVICES_TABLE = "meteorbase_services"
 
 
 class TestRequest(BaseModel):
@@ -26,6 +28,7 @@ class TestResponse(BaseModel):
     service: str
     status: str
     message: str
+    stored: bool
 
 
 @lru_cache(maxsize=1)
@@ -33,15 +36,16 @@ def get_supabase_client() -> Any:
     """Create one reusable Supabase client from the existing Render variables."""
     url = os.getenv("SUPABASE_URL")
     key = (
-        os.getenv("SUPABASE_SERVICE_KEY")
+        os.getenv("SUPABASE_SECRET_KEY")
+        or os.getenv("SUPABASE_SERVICE_KEY")
+        or os.getenv("SUPABASE_PUBLISHABLE_KEY")
         or os.getenv("SUPABASE_ANON_KEY")
         or os.getenv("SUPABASE_KEY")
     )
 
     if not url or not key:
         raise RuntimeError(
-            "SUPABASE_URL and one of SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY, "
-            "or SUPABASE_KEY must be configured."
+            "SUPABASE_URL and a Supabase secret or publishable key must be configured."
         )
 
     from supabase import create_client
@@ -49,10 +53,31 @@ def get_supabase_client() -> Any:
     return create_client(url, key)
 
 
+def store_api_result(
+    *,
+    endpoint: str,
+    method: str,
+    request_payload: dict[str, Any],
+    response_payload: dict[str, Any] | None,
+    status_code: int,
+    error_message: str | None = None,
+) -> None:
+    get_supabase_client().table(RESULTS_TABLE).insert(
+        {
+            "endpoint": endpoint,
+            "method": method,
+            "request_payload": request_payload,
+            "response_payload": response_payload,
+            "status_code": status_code,
+            "error_message": error_message,
+        }
+    ).execute()
+
+
 app = FastAPI(
     title="MeteorBase API",
-    description="A minimal FastAPI service connected to the existing Supabase project.",
-    version="1.0.0",
+    description="A FastAPI service connected to the existing Supabase project.",
+    version="1.1.0",
 )
 
 
@@ -64,6 +89,7 @@ def root() -> dict[str, Any]:
         "framework": "FastAPI",
         "docs": "/docs",
         "test_endpoint": "/api/test",
+        "results_endpoint": "/api/results",
     }
 
 
@@ -78,7 +104,9 @@ def readyz() -> dict[str, Any]:
     configured = bool(
         os.getenv("SUPABASE_URL")
         and (
-            os.getenv("SUPABASE_SERVICE_KEY")
+            os.getenv("SUPABASE_SECRET_KEY")
+            or os.getenv("SUPABASE_SERVICE_KEY")
+            or os.getenv("SUPABASE_PUBLISHABLE_KEY")
             or os.getenv("SUPABASE_ANON_KEY")
             or os.getenv("SUPABASE_KEY")
         )
@@ -87,32 +115,98 @@ def readyz() -> dict[str, Any]:
         "service": SERVICE_NAME,
         "status": "ready" if configured else "not_ready",
         "supabase_configured": configured,
+        "tables": {"services": SERVICES_TABLE, "results": RESULTS_TABLE},
     }
 
 
 @app.get("/api/test", response_model=TestResponse, tags=["test"])
 def test_get() -> TestResponse:
-    """Simple endpoint for confirming that the FastAPI service is responding."""
-    return TestResponse(
-        service=SERVICE_NAME,
-        status="ok",
-        message="FastAPI endpoint is working.",
-    )
+    """Verify the service and persist the successful test result in Supabase."""
+    response = {
+        "service": SERVICE_NAME,
+        "status": "ok",
+        "message": "FastAPI endpoint is working.",
+    }
+    try:
+        store_api_result(
+            endpoint="/api/test",
+            method="GET",
+            request_payload={},
+            response_payload=response,
+            status_code=200,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase is unavailable for result storage.",
+        ) from exc
+
+    return TestResponse(**response, stored=True)
 
 
 @app.post("/api/test", response_model=TestResponse, tags=["test"])
 def test_post(payload: TestRequest) -> TestResponse:
-    """Echo a JSON message to verify request parsing and Pydantic validation."""
-    return TestResponse(service=SERVICE_NAME, status="ok", message=payload.message)
+    """Echo a JSON message and persist the test result in Supabase."""
+    response = {
+        "service": SERVICE_NAME,
+        "status": "ok",
+        "message": payload.message,
+    }
+    try:
+        store_api_result(
+            endpoint="/api/test",
+            method="POST",
+            request_payload=payload.model_dump(),
+            response_payload=response,
+            status_code=200,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase is unavailable for result storage.",
+        ) from exc
+
+    return TestResponse(**response, stored=True)
+
+
+@app.get("/api/results", tags=["supabase"])
+def list_results(
+    limit: int = Query(default=25, ge=1, le=100),
+) -> dict[str, Any]:
+    """Return recent API test results from the isolated Supabase table."""
+    try:
+        result = (
+            get_supabase_client()
+            .table(RESULTS_TABLE)
+            .select(
+                "id, endpoint, method, request_payload, response_payload, "
+                "status_code, error_message, created_at"
+            )
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase is unavailable for result retrieval.",
+        ) from exc
+
+    return {
+        "service": SERVICE_NAME,
+        "status": "ok",
+        "table": RESULTS_TABLE,
+        "data": result.data or [],
+    }
 
 
 @app.get("/api/services", tags=["supabase"])
 def list_services() -> dict[str, Any]:
-    """Read active services from the existing Supabase `services` table."""
+    """Read active services from the isolated Supabase services table."""
     try:
         result = (
             get_supabase_client()
-            .table("services")
+            .table(SERVICES_TABLE)
             .select("id, name, display_name, description, is_active, created_at, updated_at")
             .eq("is_active", True)
             .order("name")
@@ -121,10 +215,15 @@ def list_services() -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail={"message": "Supabase is unavailable.", "error": str(exc)},
+            detail="Supabase is unavailable for service retrieval.",
         ) from exc
 
-    return {"service": SERVICE_NAME, "status": "ok", "data": result.data or []}
+    return {
+        "service": SERVICE_NAME,
+        "status": "ok",
+        "table": SERVICES_TABLE,
+        "data": result.data or [],
+    }
 
 
 if __name__ == "__main__":
