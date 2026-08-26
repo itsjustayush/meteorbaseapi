@@ -1,8 +1,0 @@
--- Compatibility entrypoint for older MeteorBase installations.
--- This file intentionally creates no raw API-key column.
---
--- 1. Run migration_secure_keys.sql to hash and remove any legacy api_key values.
--- 2. Run schema.sql to apply the complete current schema and RLS policies.
---
--- Keeping this file as a pointer prevents an old repair script from recreating
--- plaintext secrets during a deployment repair.

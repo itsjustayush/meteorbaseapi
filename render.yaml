@@ -2,8 +2,8 @@ services:
   - type: web
     name: meteorbase
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 30 app:app
+    buildCommand: pip install "fastapi==0.116.1" "uvicorn[standard]==0.35.0" "supabase==2.31.0" "python-dotenv==1.2.2"
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     autoDeployTrigger: commit
     envVars:

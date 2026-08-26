@@ -1,103 +1,138 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from functools import lru_cache
+from typing import Any
 
-from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template
+try:
+    from dotenv import load_dotenv
+except ImportError:  # Local smoke tests may run without optional dotenv support.
+    def load_dotenv() -> bool:
+        return False
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
+SERVICE_NAME = "meteorbase"
 
-BASE_DIR = Path(__file__).resolve().parent
+
+class TestRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=500)
 
 
-def template_context() -> dict[str, str]:
+class TestResponse(BaseModel):
+    service: str
+    status: str
+    message: str
+
+
+@lru_cache(maxsize=1)
+def get_supabase_client() -> Any:
+    """Create one reusable Supabase client from the existing Render variables."""
+    url = os.getenv("SUPABASE_URL")
+    key = (
+        os.getenv("SUPABASE_SERVICE_KEY")
+        or os.getenv("SUPABASE_ANON_KEY")
+        or os.getenv("SUPABASE_KEY")
+    )
+
+    if not url or not key:
+        raise RuntimeError(
+            "SUPABASE_URL and one of SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY, "
+            "or SUPABASE_KEY must be configured."
+        )
+
+    from supabase import create_client
+
+    return create_client(url, key)
+
+
+app = FastAPI(
+    title="MeteorBase API",
+    description="A minimal FastAPI service connected to the existing Supabase project.",
+    version="1.0.0",
+)
+
+
+@app.get("/", tags=["system"])
+def root() -> dict[str, Any]:
     return {
-        "supabase_url": os.environ.get("SUPABASE_URL", ""),
-        "supabase_key": os.environ.get("SUPABASE_ANON_KEY")
-        or os.environ.get("SUPABASE_KEY", ""),
-        "base_url": os.environ.get("PUBLIC_BASE_URL", "https://tinyapi-urjr.onrender.com"),
+        "service": SERVICE_NAME,
+        "status": "ok",
+        "framework": "FastAPI",
+        "docs": "/docs",
+        "test_endpoint": "/api/test",
     }
 
 
-def create_app() -> Flask:
-    app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
-    app.config.update(
-        JSON_SORT_KEYS=False,
-        MAX_CONTENT_LENGTH=int(os.environ.get("MAX_REQUEST_BYTES", str(2 * 1024 * 1024))),
+@app.get("/healthz", tags=["system"])
+def healthz() -> dict[str, str]:
+    """Lightweight Render health check that does not require a database round trip."""
+    return {"service": SERVICE_NAME, "status": "ok"}
+
+
+@app.get("/readyz", tags=["system"])
+def readyz() -> dict[str, Any]:
+    configured = bool(
+        os.getenv("SUPABASE_URL")
+        and (
+            os.getenv("SUPABASE_SERVICE_KEY")
+            or os.getenv("SUPABASE_ANON_KEY")
+            or os.getenv("SUPABASE_KEY")
+        )
+    )
+    return {
+        "service": SERVICE_NAME,
+        "status": "ready" if configured else "not_ready",
+        "supabase_configured": configured,
+    }
+
+
+@app.get("/api/test", response_model=TestResponse, tags=["test"])
+def test_get() -> TestResponse:
+    """Simple endpoint for confirming that the FastAPI service is responding."""
+    return TestResponse(
+        service=SERVICE_NAME,
+        status="ok",
+        message="FastAPI endpoint is working.",
     )
 
-    from meteorbase.admin import bp as admin_bp
-    from meteorbase.client import bp as client_bp
-    from meteorbase.proxy import bp as gateway_bp
-    from meteorbase.registry import bp as registry_bp
 
-    app.register_blueprint(registry_bp)
-    app.register_blueprint(client_bp)
-    app.register_blueprint(gateway_bp)
-    app.register_blueprint(admin_bp)
-
-    @app.after_request
-    def add_security_headers(response):
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-        return response
-
-    @app.route("/")
-    def home():
-        return render_template("index.html", **template_context())
-
-    @app.route("/auth")
-    @app.route("/auth/callback")
-    def auth():
-        return render_template("auth.html", **template_context())
-
-    @app.route("/dashboard")
-    def dashboard():
-        return render_template("dashboard.html", **template_context())
-
-    @app.route("/docs")
-    def docs():
-        return render_template("docs.html", **template_context())
-
-    @app.route("/healthz")
-    def healthz():
-        return jsonify({"service": "meteorbase", "status": "ok"}), 200
-
-    @app.route("/readyz")
-    def readyz():
-        required = ("SUPABASE_URL", "SUPABASE_JWT_SECRET", "INTERNAL_SECRET")
-        missing = [name for name in required if not os.environ.get(name)]
-        if not (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")):
-            missing.append("SUPABASE_SERVICE_KEY or SUPABASE_KEY")
-        if missing:
-            return jsonify({"service": "meteorbase", "status": "not_ready", "missing": missing}), 503
-
-        try:
-            from meteorbase.db import verify_gateway_schema
-
-            verify_gateway_schema()
-            return jsonify({"service": "meteorbase", "status": "ready"}), 200
-        except Exception:
-            app.logger.exception("MeteorBase readiness check failed")
-            return jsonify({"status": "not_ready", "reason": "schema_or_database_unavailable"}), 503
-
-    @app.route("/ping")
-    def ping():
-        return readyz()
-
-    @app.errorhandler(413)
-    def request_too_large(_error):
-        return jsonify({"error": "Request body exceeds the configured size limit."}), 413
-
-    return app
+@app.post("/api/test", response_model=TestResponse, tags=["test"])
+def test_post(payload: TestRequest) -> TestResponse:
+    """Echo a JSON message to verify request parsing and Pydantic validation."""
+    return TestResponse(service=SERVICE_NAME, status="ok", message=payload.message)
 
 
-app = create_app()
+@app.get("/api/services", tags=["supabase"])
+def list_services() -> dict[str, Any]:
+    """Read active services from the existing Supabase `services` table."""
+    try:
+        result = (
+            get_supabase_client()
+            .table("services")
+            .select("id, name, display_name, description, is_active, created_at, updated_at")
+            .eq("is_active", True)
+            .order("name")
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"message": "Supabase is unavailable.", "error": str(exc)},
+        ) from exc
+
+    return {"service": SERVICE_NAME, "status": "ok", "data": result.data or []}
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=os.environ.get("FLASK_DEBUG") == "1")
+    import uvicorn
+
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=os.getenv("FASTAPI_RELOAD") == "1",
+    )
