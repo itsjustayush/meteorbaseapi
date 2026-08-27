@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
+from uuid import UUID
 
 try:
     from dotenv import load_dotenv
@@ -10,30 +12,42 @@ except ImportError:  # Local smoke tests may run without optional dotenv support
     def load_dotenv() -> bool:
         return False
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 load_dotenv()
 
 SERVICE_NAME = "meteorbase"
-RESULTS_TABLE = "meteorbase_api_results"
-SERVICES_TABLE = "meteorbase_services"
+TASKS_TABLE = "meteorbase_tasks"
 
 
-class TestRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=500)
+class TaskCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
+    completed: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class TestResponse(BaseModel):
-    service: str
-    status: str
-    message: str
-    stored: bool
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
+    completed: bool | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class Task(BaseModel):
+    id: UUID
+    title: str
+    description: str | None = None
+    completed: bool
+    metadata: dict[str, Any]
+    created_at: str
+    updated_at: str
 
 
 @lru_cache(maxsize=2)
 def get_supabase_client(require_write: bool = False) -> Any:
-    """Create a reusable Supabase client from the existing Render variables."""
+    """Create a reusable Supabase client from Render environment variables."""
     url = os.getenv("SUPABASE_URL")
     write_key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
     read_key = (
@@ -45,43 +59,32 @@ def get_supabase_client(require_write: bool = False) -> Any:
     key = write_key if require_write else read_key
 
     if not url or not key:
-        if require_write:
-            raise RuntimeError(
-                "SUPABASE_URL and SUPABASE_SECRET_KEY or SUPABASE_SERVICE_KEY "
-                "must be configured for database writes."
-            )
-        raise RuntimeError("SUPABASE_URL and a Supabase key must be configured.")
+        required = "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_KEY" if require_write else "a Supabase key"
+        raise RuntimeError(f"SUPABASE_URL and {required} must be configured.")
 
     from supabase import create_client
 
     return create_client(url, key)
 
 
-def store_api_result(
-    *,
-    endpoint: str,
-    method: str,
-    request_payload: dict[str, Any],
-    response_payload: dict[str, Any] | None,
-    status_code: int,
-    error_message: str | None = None,
-) -> None:
-    get_supabase_client(require_write=True).table(RESULTS_TABLE).insert(
-        {
-            "endpoint": endpoint,
-            "method": method,
-            "request_payload": request_payload,
-            "response_payload": response_payload,
-            "status_code": status_code,
-            "error_message": error_message,
-        }
-    ).execute()
+def from_exception(exc: Exception) -> HTTPException:
+    """Attach the original exception as the cause without exposing it to clients."""
+    error = HTTPException(
+        status_code=503,
+        detail="Supabase is unavailable. Check the Render Supabase environment variables and server key.",
+    )
+    error.__cause__ = exc
+    return error
+
+
+def task_columns() -> str:
+    return "id, title, description, completed, metadata, created_at, updated_at"
 
 
 app = FastAPI(
-    title="MeteorBase API",
-    description="A FastAPI service connected to the Ayush MeteorAPI Supabase project.",
-    version="1.2.0",
+    title="MeteorBase Task API",
+    description="A small Supabase-backed CRUD API for temporary testing.",
+    version="2.0.0",
 )
 
 
@@ -92,14 +95,19 @@ def root() -> dict[str, Any]:
         "status": "ok",
         "framework": "FastAPI",
         "docs": "/docs",
-        "test_endpoint": "/api/test",
-        "results_endpoint": "/api/results",
+        "task_table": TASKS_TABLE,
+        "endpoints": {
+            "create": "POST /task",
+            "list": "GET /get",
+            "read": "GET /task/{task_id}",
+            "update": "PATCH /task/{task_id}",
+            "delete": "DELETE /task/{task_id}",
+        },
     }
 
 
 @app.get("/healthz", tags=["system"])
 def healthz() -> dict[str, str]:
-    """Lightweight Render health check that does not require a database round trip."""
     return {"service": SERVICE_NAME, "status": "ok"}
 
 
@@ -109,138 +117,118 @@ def readyz() -> dict[str, Any]:
         os.getenv("SUPABASE_URL")
         and (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY"))
     )
-    read_key_configured = bool(
-        os.getenv("SUPABASE_URL")
-        and (
-            os.getenv("SUPABASE_SECRET_KEY")
-            or os.getenv("SUPABASE_SERVICE_KEY")
-            or os.getenv("SUPABASE_PUBLISHABLE_KEY")
-            or os.getenv("SUPABASE_ANON_KEY")
-            or os.getenv("SUPABASE_KEY")
-        )
-    )
     return {
         "service": SERVICE_NAME,
         "status": "ready" if write_key_configured else "not_ready",
-        "supabase_configured": read_key_configured,
         "supabase_write_key_configured": write_key_configured,
-        "tables": {"services": SERVICES_TABLE, "results": RESULTS_TABLE},
+        "table": TASKS_TABLE,
     }
 
 
-@app.get("/api/test", response_model=TestResponse, tags=["test"])
-def test_get() -> TestResponse:
-    """Verify the service and persist the successful test result in Supabase."""
-    response = {
-        "service": SERVICE_NAME,
-        "status": "ok",
-        "message": "FastAPI endpoint is working.",
-    }
-    try:
-        store_api_result(
-            endpoint="/api/test",
-            method="GET",
-            request_payload={},
-            response_payload=response,
-            status_code=200,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Supabase result storage failed. Set the destination project's "
-                "secret/service key in Render as SUPABASE_SECRET_KEY or "
-                "SUPABASE_SERVICE_KEY."
-            ),
-        ) from exc
-
-    return TestResponse(**response, stored=True)
+@app.get("/api/test", tags=["test"])
+def api_test() -> dict[str, str]:
+    return {"service": SERVICE_NAME, "status": "ok", "message": "FastAPI is working."}
 
 
-@app.post("/api/test", response_model=TestResponse, tags=["test"])
-def test_post(payload: TestRequest) -> TestResponse:
-    """Echo a JSON message and persist the test result in Supabase."""
-    response = {
-        "service": SERVICE_NAME,
-        "status": "ok",
-        "message": payload.message,
-    }
-    try:
-        store_api_result(
-            endpoint="/api/test",
-            method="POST",
-            request_payload=payload.model_dump(),
-            response_payload=response,
-            status_code=200,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Supabase result storage failed. Set the destination project's "
-                "secret/service key in Render as SUPABASE_SECRET_KEY or "
-                "SUPABASE_SERVICE_KEY."
-            ),
-        ) from exc
-
-    return TestResponse(**response, stored=True)
-
-
-@app.get("/api/results", tags=["supabase"])
-def list_results(
-    limit: int = Query(default=25, ge=1, le=100),
-) -> dict[str, Any]:
-    """Return recent API test results from the isolated Supabase table."""
+@app.post("/task", response_model=Task, status_code=status.HTTP_201_CREATED, tags=["tasks"])
+def create_task(payload: TaskCreate) -> Task:
     try:
         result = (
+            get_supabase_client(require_write=True)
+            .table(TASKS_TABLE)
+            .insert(payload.model_dump())
+            .execute()
+        )
+    except Exception as exc:
+        raise from_exception(exc)
+
+    if not result.data:
+        raise HTTPException(status_code=503, detail="Supabase did not return the created task.")
+    return Task.model_validate(result.data[0])
+
+
+@app.get("/get", response_model=list[Task], tags=["tasks"])
+def get_tasks(
+    limit: int = Query(default=25, ge=1, le=100),
+    completed: bool | None = Query(default=None),
+) -> list[Task]:
+    try:
+        query = (
             get_supabase_client()
-            .table(RESULTS_TABLE)
-            .select(
-                "id, endpoint, method, request_payload, response_payload, "
-                "status_code, error_message, created_at"
-            )
+            .table(TASKS_TABLE)
+            .select(task_columns())
             .order("created_at", desc=True)
             .limit(limit)
-            .execute()
         )
+        if completed is not None:
+            query = query.eq("completed", completed)
+        result = query.execute()
     except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail="Supabase is unavailable for result retrieval.",
-        ) from exc
+        raise from_exception(exc)
 
-    return {
-        "service": SERVICE_NAME,
-        "status": "ok",
-        "table": RESULTS_TABLE,
-        "data": result.data or [],
-    }
+    return [Task.model_validate(row) for row in (result.data or [])]
 
 
-@app.get("/api/services", tags=["supabase"])
-def list_services() -> dict[str, Any]:
-    """Read active services from the isolated Supabase services table."""
+@app.get("/task/{task_id}", response_model=Task, tags=["tasks"])
+def get_task(task_id: UUID) -> Task:
     try:
         result = (
             get_supabase_client()
-            .table(SERVICES_TABLE)
-            .select("id, name, display_name, description, is_active, created_at, updated_at")
-            .eq("is_active", True)
-            .order("name")
+            .table(TASKS_TABLE)
+            .select(task_columns())
+            .eq("id", str(task_id))
+            .limit(1)
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail="Supabase is unavailable for service retrieval.",
-        ) from exc
+        raise from_exception(exc)
 
-    return {
-        "service": SERVICE_NAME,
-        "status": "ok",
-        "table": SERVICES_TABLE,
-        "data": result.data or [],
-    }
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return Task.model_validate(result.data[0])
+
+
+@app.patch("/task/{task_id}", response_model=Task, tags=["tasks"])
+def update_task(task_id: UUID, payload: TaskUpdate) -> Task:
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Provide at least one field to update.")
+
+    changes["updated_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        result = (
+            get_supabase_client(require_write=True)
+            .table(TASKS_TABLE)
+            .update(changes)
+            .eq("id", str(task_id))
+            .select(task_columns())
+            .execute()
+        )
+    except Exception as exc:
+        raise from_exception(exc)
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return Task.model_validate(result.data[0])
+
+
+@app.delete("/task/{task_id}", tags=["tasks"])
+def delete_task(task_id: UUID) -> dict[str, str]:
+    try:
+        result = (
+            get_supabase_client(require_write=True)
+            .table(TASKS_TABLE)
+            .delete()
+            .eq("id", str(task_id))
+            .select("id")
+            .execute()
+        )
+    except Exception as exc:
+        raise from_exception(exc)
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return {"status": "deleted", "id": str(task_id)}
 
 
 if __name__ == "__main__":
