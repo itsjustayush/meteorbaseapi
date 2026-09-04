@@ -49,17 +49,11 @@ class Task(BaseModel):
 def get_supabase_client(require_write: bool = False) -> Any:
     """Create a reusable Supabase client from Render environment variables."""
     url = os.getenv("SUPABASE_URL")
-    write_key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    read_key = (
-        write_key
-        or os.getenv("SUPABASE_PUBLISHABLE_KEY")
-        or os.getenv("SUPABASE_ANON_KEY")
-        or os.getenv("SUPABASE_KEY")
-    )
-    key = write_key if require_write else read_key
+    key_names = supabase_key_names(require_write=require_write)
+    key = next((os.getenv(name) for name in key_names if os.getenv(name)), None)
 
     if not url or not key:
-        required = "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_KEY" if require_write else "a Supabase key"
+        required = " or ".join(key_names)
         raise RuntimeError(f"SUPABASE_URL and {required} must be configured.")
 
     from supabase import create_client
@@ -75,6 +69,22 @@ def from_exception(exc: Exception) -> HTTPException:
     )
     error.__cause__ = exc
     return error
+
+
+def supabase_key_names(require_write: bool = False) -> list[str]:
+    """Return accepted Supabase key variable names for the current access mode."""
+    write_names = [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_SERVICE_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+    ]
+    read_names = [
+        *write_names,
+        "SUPABASE_PUBLISHABLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_KEY",
+    ]
+    return write_names if require_write else read_names
 
 
 def task_columns() -> str:
@@ -115,7 +125,7 @@ def healthz() -> dict[str, str]:
 def readyz() -> dict[str, Any]:
     write_key_configured = bool(
         os.getenv("SUPABASE_URL")
-        and (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY"))
+        and any(os.getenv(name) for name in supabase_key_names(require_write=True))
     )
     return {
         "service": SERVICE_NAME,
