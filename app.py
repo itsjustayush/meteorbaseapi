@@ -118,7 +118,7 @@ app = FastAPI(
 
 @app.get("/", response_class=FileResponse)
 async def root():
-    return "index.html"
+    return "index.html" 
 
 
 @app.get("/healthz", tags=["system"])
