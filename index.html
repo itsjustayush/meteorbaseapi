@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeteorBase API | System Telemetry</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Typography */
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #05070a; color: #ecece8; overflow-x: hidden; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Liquid Glass Panels */
+        .glass-panel {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 30px 64px -26px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+            box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+        }
+
+        /* Glowing Text & Buttons */
+        .text-gradient {
+            background: linear-gradient(180deg, #ffffff 16%, rgba(255, 255, 255, 0.4));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .glow-button {
+            background: linear-gradient(180deg, #ffffff, #d8ddec);
+            color: #0a0b10;
+            box-shadow: 0 10px 26px -14px rgba(150, 175, 255, 0.95), inset 0 -1px rgba(0, 0, 0, 0.16);
+            transition: all 0.3s ease;
+        }
+        .glow-button:hover {
+            box-shadow: 0 16px 32px -14px rgba(150, 175, 255, 1), inset 0 -1px rgba(0, 0, 0, 0.16);
+            transform: translateY(-2px);
+        }
+
+        /* Ambient Aurora Background */
+        .aurora-bg {
+            position: fixed;
+            inset: -20%;
+            z-index: -2;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(18, 120, 255, 0.15), transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(56, 220, 214, 0.1), transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(228, 75, 60, 0.1), transparent 50%);
+            filter: blur(60px);
+            animation: aurora Drift 20s linear infinite alternate;
+        }
+
+        /* Entrance Animations */
+        .stagger-up { opacity: 0; transform: translateY(20px); animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes auroraDrift {
+            0% { transform: rotate(0deg) scale(1); }
+            100% { transform: rotate(5deg) scale(1.1); }
+        }
+
+        /* Status Dots */
+        .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 10px currentColor;}
+        .status-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col items-center justify-center p-6 sm:p-12 relative">
+
+    <!-- Procedural Backgrounds -->
+    <div class="aurora-bg"></div>
+    <canvas id="particle-canvas" class="fixed inset-0 z-[-1] opacity-40 pointer-events-none"></canvas>
+
+    <!-- Top Floating Dock -->
+    <nav class="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-panel rounded-full px-6 py-3 flex items-center gap-6 stagger-up">
+        <div class="flex items-center gap-3 border-r border-white/10 pr-6">
+            <div class="h-6 w-6 rounded-full bg-white flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.42)]">
+                <div class="h-2 w-2 rounded-full bg-black"></div>
+            </div>
+            <span class="font-bold tracking-tight text-sm text-white">MeteorBase</span>
+        </div>
+        <div class="mono text-xs text-gray-400 tracking-widest uppercase">System Telemetry</div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl w-full mt-24 relative z-10">
+        
+        <!-- Hero Section -->
+        <header class="mb-16 text-center stagger-up delay-1">
+            <h1 class="text-6xl sm:text-7xl font-bold tracking-tighter text-gradient mb-4">Core Infrastructure</h1>
+            <p class="text-gray-400 text-lg sm:text-xl font-light max-w-2xl mx-auto">
+                Real-time monitoring of environment nodes, latency thresholds, and API gateways.
+            </p>
+            <div class="mt-8">
+                <button onclick="refresh()" class="glow-button px-8 py-3 rounded-full font-bold text-sm tracking-wide uppercase transition hover:scale-105">
+                    Execute Ping Sequence
+                </button>
+            </div>
+        </header>
+
+        <!-- Telemetry Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            <!-- Health Node -->
+            <div class="glass-panel rounded-3xl p-6 stagger-up delay-2 flex flex-col justify-between h-40">
+                <div class="flex justify-between items-start">
+                    <h2 class="mono text-sm text-gray-400 tracking-widest uppercase">/healthz</h2>
+                    <span id="h-dot" class="status-dot text-gray-600 bg-current"></span>
+                </div>
+                <div>
+                    <p id="h-stat" class="text-xl font-bold text-white mb-1">Awaiting...</p>
+                    <p class="mono text-xs text-gray-500">Latency: <span id="h-lat" class="text-gray-300">--</span></p>
+                </div>
+            </div>
+
+            <!-- Ready Node -->
+            <div class="glass-panel rounded-3xl p-6 stagger-up delay-3 flex flex-col justify-between h-40">
+                <div class="flex justify-between items-start">
+                    <h2 class="mono text-sm text-gray-400 tracking-widest uppercase">/readyz</h2>
+                    <span id="r-dot" class="status-dot text-gray-600 bg-current"></span>
+                </div>
+                <div>
+                    <p id="r-stat" class="text-xl font-bold text-white mb-1">Awaiting...</p>
+                    <p class="mono text-xs text-gray-500">Latency: <span id="r-lat" class="text-gray-300">--</span></p>
+                </div>
+            </div>
+
+            <!-- Test Node -->
+            <div class="glass-panel rounded-3xl p-6 stagger-up delay-4 flex flex-col justify-between h-40">
+                <div class="flex justify-between items-start">
+                    <h2 class="mono text-sm text-gray-400 tracking-widest uppercase">/api/test</h2>
+                    <span id="t-dot" class="status-dot text-gray-600 bg-current"></span>
+                </div>
+                <div>
+                    <p id="t-stat" class="text-xl font-bold text-white mb-1">Awaiting...</p>
+                    <p class="mono text-xs text-gray-500">Latency: <span id="t-lat" class="text-gray-300">--</span></p>
+                </div>
+            </div>
+
+            <!-- Interactive Docs -->
+            <a href="/docs" class="glass-panel rounded-3xl p-6 stagger-up delay-4 flex flex-col justify-between h-40 group cursor-pointer border border-blue-500/30 hover:border-blue-400/80">
+                <div class="flex justify-between items-start">
+                    <h2 class="mono text-sm text-blue-400 tracking-widest uppercase">Swagger UI</h2>
+                    <svg class="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </div>
+                <div>
+                    <p class="text-xl font-bold text-white mb-1">Open OAS 3.1</p>
+                    <p class="mono text-xs text-gray-500">Interactive Environment</p>
+                </div>
+            </a>
+        </div>
+    </main>
+
+    <!-- Telemetry Logic & "Structure Flow" Canvas Script -->
+    <script>
+        // API PING LOGIC
+        async function check(ep, statId, latId, dotId) {
+            const start = performance.now();
+            const stat = document.getElementById(statId);
+            const lat = document.getElementById(latId);
+            const dot = document.getElementById(dotId);
+            
+            stat.textContent = 'Pinging...';
+            dot.className = 'status-dot text-blue-400 bg-current status-pulse';
+
+            try {
+                const res = await fetch(ep);
+                const latency = Math.round(performance.now() - start);
+                
+                lat.textContent = latency + 'ms';
+                if(res.ok) {
+                    stat.textContent = 'Operational';
+                    dot.className = 'status-dot text-emerald-400 bg-current status-pulse';
+                } else {
+                    stat.textContent = 'Degraded';
+                    dot.className = 'status-dot text-amber-400 bg-current status-pulse';
+                }
+            } catch (err) {
+                stat.textContent = 'Offline';
+                lat.textContent = 'Timeout';
+                dot.className = 'status-dot text-red-500 bg-current';
+            }
+        }
+
+        function refresh() {
+            check('/healthz', 'h-stat', 'h-lat', 'h-dot');
+            check('/readyz', 'r-stat', 'r-lat', 'r-dot');
+            check('/api/test', 't-stat', 't-lat', 't-dot');
+        }
+
+        window.onload = refresh;
+
+        // "STRUCTURE FLOW" INSPIRED CANVAS PARTICLES
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 1.5 + 0.5;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * -0.5 - 0.1;
+                this.alpha = Math.random() * 0.5 + 0.1;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.y < 0) {
+                    this.y = canvas.height;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            const count = window.innerWidth < 768 ? 50 : 150;
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateParticles);
+        }
+
+        initParticles();
+        animateParticles();
+    </script>
+</body>
+</html>

@@ -14,7 +14,7 @@ except ImportError:  # Local smoke tests may run without optional dotenv support
 
 from fastapi import FastAPI, HTTPException, Query, status
 from pydantic import BaseModel, Field
-
+from fastapi.responses import FileResponse
 load_dotenv()
 
 SERVICE_NAME = "meteorbase"
@@ -92,28 +92,33 @@ def task_columns() -> str:
 
 
 app = FastAPI(
-    title="MeteorBase Task API",
+    title="MeteorBase  API",
     description="A small Supabase-backed CRUD API for temporary testing.",
     version="2.0.0",
 )
 
 
-@app.get("/", tags=["system"])
-def root() -> dict[str, Any]:
-    return {
-        "service": SERVICE_NAME,
-        "status": "ok",
-        "framework": "FastAPI",
-        "docs": "/docs",
-        "task_table": TASKS_TABLE,
-        "endpoints": {
-            "create": "POST /task",
-            "list": "GET /get",
-            "read": "GET /task/{task_id}",
-            "update": "PATCH /task/{task_id}",
-            "delete": "DELETE /task/{task_id}",
-        },
-    }
+#@app.get("/", tags=["system"])
+#def root() -> dict[str, Any]:
+#    return {
+#        "service": SERVICE_NAME,
+#        "status": "ok",
+#        "framework": "FastAPI",
+#        "docs": "/docs",
+#        "task_table": TASKS_TABLE,
+#        "endpoints": {
+#            "create": "POST /task",
+#            "list": "GET /get",
+#            "read": "GET /task/{task_id}",
+#            "update": "PATCH /task/{task_id}",
+#            "delete": "DELETE /task/{task_id}",
+#        },
+#    }
+
+
+@app.get("/", response_class=FileResponse)
+async def root():
+    return "index.html"
 
 
 @app.get("/healthz", tags=["system"])
