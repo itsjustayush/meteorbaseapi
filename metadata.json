@@ -1,6 +1,6 @@
 {
   "name": "MeteorBase API | System Telemetry",
-  "description": "MeteorBase API - Generic text summarizer powered by Google Gemini and Firebase Firestore with automated 60-day retention and telemetry ping monitoring.",
+  "description": "MeteorBase API - Real-time system telemetry, Gemini-powered summarization, and developer console with Firebase Google Authentication, SHA-256 hashed API key generator, rate limiting, and 90-day retention.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
