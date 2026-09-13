@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "DynamicRecord": {
+      "title": "DynamicRecord",
+      "description": "Flexible schema supporting dynamic payloads, summaries, tasks, and future custom entities with automated 90-day retention",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique record identifier" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "expires_at": { "type": "string", "format": "date-time", "description": "Expiration timestamp (90 days retention)" },
+        "created_at_epoch": { "type": "number", "description": "Creation unix epoch timestamp in seconds" },
+        "expires_at_epoch": { "type": "number", "description": "Expiration unix epoch timestamp in seconds" }
+      },
+      "required": ["id", "created_at"]
+    }
+  },
+  "firestore": {
+    "/{collection}/{documentId}": {
+      "schema": "DynamicRecord",
+      "description": "Flexible collections accommodating summaries, tasks, telemetry, and future application features"
+    }
+  }
+}
