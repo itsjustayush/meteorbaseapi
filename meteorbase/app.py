@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import httpx
-from fastapi import FastAPI, HTTPException, Security, Depends, Query, status, Request, Response
+from fastapi import FastAPI, HTTPException, Security, Depends, Query, status, Request, Response, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from fastapi.responses import FileResponse, JSONResponse
@@ -163,9 +163,7 @@ def delete_from_firestore(collection: str, doc_id: str) -> bool:
 
 
 def verify_and_cleanup_database(collections: list[str] | None = None) -> dict[str, Any]:
-    """Automated retention cleaner: Checks timestamps and deletes records older than 90 days.
-    Runs automatically on ping with zero confirmation.
-    """
+    """Automated retention cleaner: Checks timestamps and deletes records older than 90 days."""
     if collections is None:
         collections = ["summaries"]
 
@@ -194,7 +192,6 @@ def verify_and_cleanup_database(collections: list[str] | None = None) -> dict[st
                     pass
 
             if is_expired and doc_id:
-                # Automatic deletion with no confirmation
                 if delete_from_firestore(col, doc_id):
                     expired_count += 1
             else:
@@ -295,7 +292,6 @@ class ApiKeyManager:
             )
 
         now_ts = time.time()
-        # 100 requests per minute
         m_win = [t for t in self.minute_windows.get(key_hash, []) if now_ts - t < 60]
         if len(m_win) >= key_data.get("rate_limit_per_min", 100):
             raise HTTPException(
@@ -303,7 +299,6 @@ class ApiKeyManager:
                 detail="Rate limit exceeded: Maximum 100 requests per minute on this key."
             )
 
-        # 1,000 requests per day
         d_win = [t for t in self.daily_windows.get(key_hash, []) if now_ts - t < 86400]
         if len(d_win) >= key_data.get("rate_limit_per_day", 1000):
             raise HTTPException(
@@ -328,6 +323,8 @@ class ApiKeyManager:
         return {
             "key_id": key_data["id"],
             "user_id": key_data.get("user_id"),
+            "user_email": key_data.get("user_email", ""),
+            "user_name": key_data.get("name", "User"),
             "rate_limit_limit": key_data.get("rate_limit_per_day", 1000),
             "rate_limit_remaining": remaining_day,
         }
@@ -389,7 +386,6 @@ def verify_api_key(
 ) -> dict[str, Any]:
     expected_key = os.getenv("MY_API_SECRET")
 
-    # Check generated user key with rate limiting
     if api_key and api_key.startswith("meteor_live_"):
         key_info = api_key_manager.verify_and_rate_limit(api_key)
         if response:
@@ -397,7 +393,6 @@ def verify_api_key(
             response.headers["X-RateLimit-Remaining"] = str(key_info["rate_limit_remaining"])
         return key_info
 
-    # Check master secret if configured
     if expected_key:
         if not api_key or api_key != expected_key:
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
@@ -429,7 +424,6 @@ class TelemetryStore:
                     self.daily_counts = data.get("daily_counts", {})
             except Exception as e:
                 logger.warning("Could not load telemetry cache: %s", e)
-        # If new or empty, initialize with realistic baseline data
         if self.total_requests == 0:
             self.total_requests = 168
             self.status_counts = {"2xx": 168, "4xx": 0, "5xx": 0}
@@ -496,7 +490,6 @@ class TelemetryStore:
         success_2xx = self.status_counts.get("2xx", 0)
         success_rate = round((success_2xx / max(1, self.total_requests)) * 100, 2)
 
-        # 24-hour hourly requests timeline
         hourly_timeline = []
         for h in range(23, -1, -1):
             slot_start = now - timedelta(hours=h + 1)
@@ -515,7 +508,6 @@ class TelemetryStore:
                 "latency_ms": slot_lat,
             })
 
-        # 90-day daily uptime status history
         daily_uptime = []
         for d in range(89, -1, -1):
             day_dt = now - timedelta(days=d)
@@ -588,7 +580,7 @@ app.add_middleware(
 )
 
 
-# Flexible Request Model (allows any arbitrary extra fields without collisions)
+# Flexible Request Model
 class SummarizeRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -597,10 +589,46 @@ class SummarizeRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Arbitrary custom metadata for future extensibility")
 
 
-# Exact Root UI endpoint (Serves previous Core Infrastructure UI with new function latencies)
+# Root UI endpoint
 @app.get("/", response_class=FileResponse)
 async def root():
     return "index.html"
+
+
+# --- NEW: SDK Client Authentication / User Info Endpoint ---
+@app.get("/api/auth/me", tags=["auth"])
+def get_current_user_profile(authorization: Optional[str] = Header(None)) -> dict[str, Any]:
+    """Validates the incoming API key Bearer token and returns the logged-in user profile details."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing Authorization header. Expected 'Bearer meteor_live_...'"
+        )
+    
+    raw_key = authorization.split(" ")[1]
+    
+    # Verify key using api_key_manager cache and database lookup
+    try:
+        key_info = api_key_manager.verify_and_rate_limit(raw_key)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key verification failed: Provided key is invalid, revoked, or expired."
+        )
+
+    # Return authenticated user details linked to this API key
+    return {
+        "status": "success",
+        "authenticated": True,
+        "user": {
+            "id": key_info.get("user_id", "unknown"),
+            "name": key_info.get("user_name", "MeteorBase User"),
+            "email": key_info.get("user_email", ""),
+            "provider": "google",
+            "verified": True
+        },
+        "key_id": key_info.get("key_id")
+    }
 
 
 # Main Summarizer Endpoint
@@ -638,12 +666,10 @@ def summarize_text(request: SummarizeRequest, api_key: Optional[str] = Depends(v
     else:
         raise HTTPException(status_code=503, detail="Gemini client is not initialized. Check GEMINI_API_KEY.")
 
-    # 90-day retention calculation
     now = datetime.now(timezone.utc)
     expires = now + timedelta(days=RETENTION_DAYS)
     summary_id = str(uuid4())
 
-    # Build dynamic document payload
     doc_payload = {
         "id": summary_id,
         "raw_text": request.text,
@@ -657,7 +683,6 @@ def summarize_text(request: SummarizeRequest, api_key: Optional[str] = Depends(v
         "metadata": request.metadata,
     }
 
-    # Extract any extra fields provided in request and store them dynamically
     for k, v in request.model_extra.items() if request.model_extra else []:
         if k not in doc_payload:
             doc_payload[k] = v
@@ -676,7 +701,6 @@ def summarize_text(request: SummarizeRequest, api_key: Optional[str] = Depends(v
     }
 
 
-# Lightweight health probe for /summarize to check endpoint latency on the dashboard
 @app.get("/summarize/health", tags=["summarizer"])
 def summarize_health() -> dict[str, Any]:
     return {
@@ -688,12 +712,8 @@ def summarize_health() -> dict[str, Any]:
     }
 
 
-# Continuous Pinging System (Verifies database & automatically cleans up 90d expired data)
 @app.get("/ping", tags=["telemetry"])
 def ping() -> dict[str, Any]:
-    """Continuous pinging endpoint for external monitors.
-    Verifies timestamps across the database and automatically purges data older than 90 days.
-    """
     cleanup_result = verify_and_cleanup_database()
     return {
         "service": SERVICE_NAME,
@@ -739,11 +759,9 @@ def api_test() -> dict[str, str]:
 
 @app.post("/cleanup", tags=["telemetry"])
 def manual_cleanup() -> dict[str, Any]:
-    """Explicit trigger to verify and automatically purge expired 90-day data."""
     return verify_and_cleanup_database()
 
 
-# Summary retrieval endpoints
 @app.get("/summaries", tags=["summaries"])
 def get_summaries(limit: int = Query(default=25, ge=1, le=100)) -> list[dict[str, Any]]:
     docs = query_firestore_collection("summaries")
@@ -768,7 +786,6 @@ def get_summary(summary_id: str) -> dict[str, Any]:
 
 @app.delete("/summaries/{summary_id}", tags=["summaries"])
 def delete_summary(summary_id: str) -> dict[str, str]:
-    """Automatic immediate deletion from Firebase without confirmation."""
     if delete_from_firestore("summaries", summary_id):
         return {"status": "deleted", "id": summary_id}
     raise HTTPException(status_code=404, detail="Summary not found in Firestore.")
@@ -776,11 +793,9 @@ def delete_summary(summary_id: str) -> dict[str, str]:
 
 @app.get("/api/telemetry/stats", tags=["telemetry"])
 def get_telemetry_stats() -> dict[str, Any]:
-    """Retrieve real real-time telemetry metrics, requests timeline, and 90-day uptime status."""
     return telemetry_store.get_stats()
 
 
-# User API Key Generation & Usage Endpoints
 class CreateApiKeyRequest(BaseModel):
     name: str = Field(default="Default Key", description="Friendly label for API key")
     user_id: str = Field(description="Google Firebase Auth User UID")
@@ -789,7 +804,6 @@ class CreateApiKeyRequest(BaseModel):
 
 @app.post("/api/user/keys", tags=["auth"])
 def create_api_key(req: CreateApiKeyRequest) -> dict[str, Any]:
-    """Generate a new secure API key with rate limits and hash storage."""
     if not req.user_id:
         raise HTTPException(status_code=400, detail="User ID is required")
     return api_key_manager.generate_key(user_id=req.user_id, name=req.name, email=req.email or "")
@@ -797,13 +811,11 @@ def create_api_key(req: CreateApiKeyRequest) -> dict[str, Any]:
 
 @app.get("/api/user/keys", tags=["auth"])
 def list_user_keys(user_id: str = Query(..., description="Firebase User UID")) -> list[dict[str, Any]]:
-    """List all API keys belonging to a user (with secret token masked)."""
     return api_key_manager.get_user_keys(user_id=user_id)
 
 
 @app.delete("/api/user/keys/{key_id}", tags=["auth"])
 def delete_user_key(key_id: str, user_id: str = Query(..., description="Firebase User UID")) -> dict[str, Any]:
-    """Revoke and delete an API key."""
     success = api_key_manager.revoke_key(key_id=key_id, user_id=user_id)
     if not success:
         raise HTTPException(status_code=404, detail="API Key not found or unauthorized")
@@ -812,14 +824,11 @@ def delete_user_key(key_id: str, user_id: str = Query(..., description="Firebase
 
 @app.get("/api/user/usage", tags=["auth"])
 def get_user_usage(user_id: str = Query(..., description="Firebase User UID")) -> dict[str, Any]:
-    """Get usage statistics and rate limit quotas for a user."""
     return api_key_manager.get_user_usage(user_id=user_id)
 
 
-# Generic Dynamic API Endpoints for Future Functions
 @app.post("/api/data/{collection}", tags=["dynamic"])
 def store_dynamic_data(collection: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Flexible storage endpoint allowing any future features to store arbitrary documents."""
     doc_id = str(payload.get("id") or uuid4())
     now = datetime.now(timezone.utc)
     payload["id"] = doc_id
@@ -835,7 +844,6 @@ def store_dynamic_data(collection: str, payload: dict[str, Any]) -> dict[str, An
 
 @app.get("/api/data/{collection}", tags=["dynamic"])
 def query_dynamic_data(collection: str, limit: int = Query(default=25, ge=1, le=100)) -> list[dict[str, Any]]:
-    """Flexible query endpoint for any collection."""
     return query_firestore_collection(collection)[:limit]
 
 
