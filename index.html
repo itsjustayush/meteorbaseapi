@@ -201,7 +201,7 @@
         <!-- 2nd div: Auth / Profile Container (div#auth-header-container) -->
         <div id="auth-header-container" class="relative flex items-center">
             <!-- 1. Unauthenticated View: Compact Pill with smooth hover expansion -->
-            <button id="unauth-trigger" onclick="handleGoogleSignIn()" class="group/unauth relative flex items-center gap-0 group-hover/unauth:gap-2.5 rounded-full border border-white/10 bg-white/[0.04] p-1 transition-all duration-300 ease-out hover:border-blue-500/50 hover:bg-white/[0.08] hover:shadow-lg focus:outline-none cursor-pointer" type="button" title="Sign in with Google">
+            <button id="unauth-trigger" onclick="openAuthModal()" class="group/unauth relative flex items-center gap-0 group-hover/unauth:gap-2.5 rounded-full border border-white/10 bg-white/[0.04] p-1 transition-all duration-300 ease-out hover:border-blue-500/50 hover:bg-white/[0.08] hover:shadow-lg focus:outline-none cursor-pointer" type="button" title="Sign In (Google or Email)">
                 <div class="relative shrink-0">
                     <!-- Placeholder Avatar -->
                     <div class="h-8 w-8 rounded-full bg-white/[0.05] border border-white/10 overflow-hidden flex items-center justify-center group-hover/unauth:border-blue-500/40 transition-all duration-300">
@@ -215,11 +215,11 @@
                         </svg>
                     </div>
                 </div>
-                <div class="text-left max-w-0 opacity-0 overflow-hidden whitespace-nowrap group-hover/unauth:max-w-[130px] group-hover/unauth:opacity-100 group-hover/unauth:pr-2.5 transition-all duration-300 ease-out">
+                <div class="text-left max-w-0 opacity-0 overflow-hidden whitespace-nowrap group-hover/unauth:max-w-[140px] group-hover/unauth:opacity-100 group-hover/unauth:pr-2.5 transition-all duration-300 ease-out">
                     <div class="font-medium text-xs text-white leading-tight tracking-tight flex items-center gap-1.5">
-                        <span>Google Sign In</span>
+                        <span>Sign In</span>
                     </div>
-                    <div class="mono text-[10px] text-gray-400 leading-tight tracking-tight mt-0.5">API Keys & Quota</div>
+                    <div class="mono text-[10px] text-gray-400 leading-tight tracking-tight mt-0.5">Google / Email Auth</div>
                 </div>
             </button>
 
@@ -697,6 +697,42 @@
                 </div>
             </div>
 
+            <!-- Cloud Firestore Web SDK Explorer Section -->
+            <div class="space-y-4 bg-white/[0.02] border border-amber-500/20 rounded-2xl p-5">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2.5">
+                        <div class="h-6 w-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">
+                            🔥
+                        </div>
+                        <div>
+                            <div class="mono text-xs text-amber-400 uppercase tracking-wider font-semibold">Cloud Firestore SDK</div>
+                            <div class="text-xs text-gray-400 mt-0.5">Project: <span class="mono text-white font-semibold">meteorbase</span> • Live read & write</div>
+                        </div>
+                    </div>
+                    <span class="mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Client SDK v10</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <button onclick="addUserFirestore()" class="btn-2 btn-2-sm w-full !text-amber-300 !border-amber-500/30 hover:!border-amber-400 hover:!shadow-amber-500/20 cursor-pointer">
+                        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>Add Document (`users`)</span>
+                    </button>
+                    <button onclick="getUsersFirestore()" class="btn-2 btn-2-sm w-full !text-blue-300 !border-blue-500/30 hover:!border-blue-400 cursor-pointer">
+                        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        <span>Read Documents (`users`)</span>
+                    </button>
+                </div>
+
+                <!-- Firestore Output Display -->
+                <div class="space-y-1.5 pt-1">
+                    <div class="flex justify-between items-center">
+                        <span class="mono text-[11px] text-gray-400">Firestore Console Output:</span>
+                        <span id="firestore-status-badge" class="mono text-[10px] text-gray-500">Ready</span>
+                    </div>
+                    <pre id="firestore-output" class="mono text-[11px] text-amber-200/90 bg-black/60 p-3 rounded-xl border border-white/10 overflow-x-auto max-h-40 custom-scroll">// Click "Add Document" or "Read Documents" to test live Cloud Firestore</pre>
+                </div>
+            </div>
+
             <!-- Quick Start Code Snippet -->
             <div class="bg-black/50 border border-white/[0.06] rounded-2xl p-4 space-y-2">
                 <div class="flex justify-between items-center">
@@ -711,30 +747,216 @@
         </div>
     </div>
 
-    <!-- Firebase Auth & Client-Side Scripts -->
+    <!-- AUTHENTICATION MODAL (Email/Password & Google Sign In) -->
+    <div id="auth-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 hidden">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-6 sm:p-7 space-y-5 border border-white/15 shadow-2xl relative">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-start border-b border-white/10 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                        M
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white tracking-tight">MeteorBase Auth</h3>
+                        <p class="text-xs text-gray-400 font-light">Firebase Authentication (Project: meteorbase)</p>
+                    </div>
+                </div>
+                <button onclick="closeAuthModal()" class="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Google One-Click Sign In -->
+            <div>
+                <button onclick="handleGoogleSignIn()" class="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white font-medium text-xs transition-all duration-200 cursor-pointer shadow-sm">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    <span>Continue with Google</span>
+                </button>
+            </div>
+
+            <!-- Divider -->
+            <div class="flex items-center gap-3">
+                <div class="h-px bg-white/10 flex-1"></div>
+                <span class="mono text-[10px] text-gray-500 uppercase tracking-widest">or email & password</span>
+                <div class="h-px bg-white/10 flex-1"></div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex rounded-xl bg-white/[0.04] p-1 border border-white/10">
+                <button id="auth-tab-signin" onclick="switchAuthTab('signin')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-blue-500 text-white transition-all cursor-pointer">
+                    Sign In
+                </button>
+                <button id="auth-tab-signup" onclick="switchAuthTab('signup')" class="flex-1 py-1.5 text-xs font-medium text-gray-400 hover:text-white rounded-lg transition-all cursor-pointer">
+                    Create Account
+                </button>
+            </div>
+
+            <!-- Form -->
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-3.5">
+                <div id="auth-name-field" class="space-y-1 hidden">
+                    <label class="mono text-[11px] text-gray-400">Display Name</label>
+                    <input id="auth-name" type="text" placeholder="Ada Lovelace" class="w-full bg-black/40 border border-white/10 focus:border-blue-400 focus:outline-none rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-600 transition-colors" />
+                </div>
+                <div class="space-y-1">
+                    <label class="mono text-[11px] text-gray-400">Email Address</label>
+                    <input id="auth-email" type="email" required placeholder="user@meteorbase.io" class="w-full bg-black/40 border border-white/10 focus:border-blue-400 focus:outline-none rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-600 transition-colors" />
+                </div>
+                <div class="space-y-1">
+                    <label class="mono text-[11px] text-gray-400">Password</label>
+                    <input id="auth-password" type="password" required minlength="6" placeholder="••••••••" class="w-full bg-black/40 border border-white/10 focus:border-blue-400 focus:outline-none rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-600 transition-colors" />
+                </div>
+
+                <!-- Error / Status Box -->
+                <div id="auth-error-box" class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs hidden"></div>
+
+                <!-- Submit Button -->
+                <button id="auth-submit-btn" type="submit" class="btn-2 w-full !text-white !bg-gradient-to-r !from-blue-600 !to-indigo-600 !border-blue-400/40 hover:!border-blue-300 cursor-pointer">
+                    <span id="auth-submit-text">Sign In with Email</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase Auth, Firestore & Analytics Client-Side Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { 
+            getAuth, 
+            signInWithPopup, 
+            GoogleAuthProvider, 
+            signOut, 
+            onAuthStateChanged,
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            updateProfile
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            doc, 
+            setDoc, 
+            getDoc 
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 
-        // Firebase Client Configuration
+        // Your web app's Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyAgRSbKL6fh0AXsVn-6XrH4Ev3VK3Pq8TM",
-            authDomain: "itsjustayush.firebaseapp.com",
-            projectId: "itsjustayush",
-            storageBucket: "itsjustayush.firebasestorage.app",
-            messagingSenderId: "84209084399",
-            appId: "1:84209084399:web:06a77eeb154a0a42e5f81a"
+            apiKey: "AIzaSyBU0d9ppiAM9Ta7PMlb9hRvYPhyj7ai1EM",
+            authDomain: "meteorbase.firebaseapp.com",
+            projectId: "meteorbase",
+            storageBucket: "meteorbase.firebasestorage.app",
+            messagingSenderId: "303964563793",
+            appId: "1:303964563793:web:e788dc3f6aaed34d188b70",
+            measurementId: "G-XHWLV0Z7XY"
         };
 
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
+
+        // Optional Analytics
+        let analytics = null;
+        isSupported().then(supported => {
+            if (supported) analytics = getAnalytics(app);
+        }).catch(() => {});
+
+        window.app = app;
+        window.auth = auth;
+        window.db = db;
 
         let currentUser = null;
         let generatedKeyToken = "";
+        let authMode = "signin";
+
+        // Auth Modal Controls
+        window.openAuthModal = function() {
+            document.getElementById("auth-modal").classList.remove("hidden");
+            const errBox = document.getElementById("auth-error-box");
+            if (errBox) errBox.classList.add("hidden");
+        };
+
+        window.closeAuthModal = function() {
+            document.getElementById("auth-modal").classList.add("hidden");
+            const errBox = document.getElementById("auth-error-box");
+            if (errBox) errBox.classList.add("hidden");
+        };
+
+        window.switchAuthTab = function(mode) {
+            authMode = mode;
+            const btnSignin = document.getElementById("auth-tab-signin");
+            const btnSignup = document.getElementById("auth-tab-signup");
+            const nameField = document.getElementById("auth-name-field");
+            const submitText = document.getElementById("auth-submit-text");
+            const errorBox = document.getElementById("auth-error-box");
+            if (errorBox) errorBox.classList.add("hidden");
+
+            if (mode === "signin") {
+                btnSignin.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg bg-blue-500 text-white transition-all cursor-pointer";
+                btnSignup.className = "flex-1 py-1.5 text-xs font-medium text-gray-400 hover:text-white rounded-lg transition-all cursor-pointer";
+                nameField.classList.add("hidden");
+                submitText.textContent = "Sign In with Email";
+            } else {
+                btnSignup.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg bg-blue-500 text-white transition-all cursor-pointer";
+                btnSignin.className = "flex-1 py-1.5 text-xs font-medium text-gray-400 hover:text-white rounded-lg transition-all cursor-pointer";
+                nameField.classList.remove("hidden");
+                submitText.textContent = "Create Account";
+            }
+        };
+
+        window.handleAuthSubmit = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("auth-email").value.trim();
+            const password = document.getElementById("auth-password").value;
+            const name = document.getElementById("auth-name").value.trim();
+            const errorBox = document.getElementById("auth-error-box");
+            const submitBtn = document.getElementById("auth-submit-btn");
+
+            errorBox.classList.add("hidden");
+            submitBtn.disabled = true;
+
+            try {
+                if (authMode === "signup") {
+                    const cred = await createUserWithEmailAndPassword(auth, email, password);
+                    if (name && cred.user) {
+                        await updateProfile(cred.user, { displayName: name });
+                    }
+                    try {
+                        await setDoc(doc(db, "users", cred.user.uid), {
+                            uid: cred.user.uid,
+                            email: email,
+                            displayName: name || email.split("@")[0],
+                            createdAt: new Date().toISOString()
+                        });
+                    } catch (dbErr) {
+                        console.warn("Could not save initial user doc:", dbErr);
+                    }
+                    closeAuthModal();
+                    onUserLoggedIn(cred.user);
+                } else {
+                    const cred = await signInWithEmailAndPassword(auth, email, password);
+                    closeAuthModal();
+                    onUserLoggedIn(cred.user);
+                }
+            } catch (err) {
+                errorBox.textContent = err.message || "Authentication failed";
+                errorBox.classList.remove("hidden");
+            } finally {
+                submitBtn.disabled = false;
+            }
+        };
 
         // UI toggles
         window.handleGoogleSignIn = async function() {
+            closeAuthModal();
             try {
                 const result = await signInWithPopup(auth, googleProvider);
                 if (result && result.user) {
@@ -742,7 +964,6 @@
                 }
             } catch (err) {
                 console.warn("Google Auth popup exception:", err);
-                // Graceful fallback for sandboxed iframe permissions:
                 const fallbackEmail = "info.cometlabs@gmail.com";
                 const fallbackName = "Comet Labs";
                 const devUser = {
@@ -762,6 +983,86 @@
             } catch (e) {}
             localStorage.removeItem("meteor_cached_user");
             onUserLoggedOut();
+        };
+
+        // Firestore Interactive SDK methods
+        window.addUserFirestore = async function() {
+            const badge = document.getElementById("firestore-status-badge");
+            const output = document.getElementById("firestore-output");
+            if (badge) {
+                badge.textContent = "Writing...";
+                badge.className = "mono text-[10px] text-amber-400";
+            }
+
+            try {
+                const docData = {
+                    first: "Ada",
+                    last: "Lovelace",
+                    born: 1815,
+                    uid: currentUser ? currentUser.uid : "demo_user",
+                    createdAt: new Date().toISOString()
+                };
+
+                let docId = "";
+                if (currentUser) {
+                    await setDoc(doc(db, "users", currentUser.uid), docData, { merge: true });
+                    docId = currentUser.uid;
+                } else {
+                    const docRef = await addDoc(collection(db, "users"), docData);
+                    docId = docRef.id;
+                }
+
+                if (output) {
+                    output.textContent = JSON.stringify({
+                        status: "Document written with ID: " + docId,
+                        data: docData
+                    }, null, 2);
+                }
+                if (badge) {
+                    badge.textContent = "Success";
+                    badge.className = "mono text-[10px] text-emerald-400";
+                }
+            } catch (err) {
+                if (output) output.textContent = "Error adding document: " + err.message;
+                if (badge) {
+                    badge.textContent = "Error";
+                    badge.className = "mono text-[10px] text-red-400";
+                }
+            }
+        };
+
+        window.getUsersFirestore = async function() {
+            const badge = document.getElementById("firestore-status-badge");
+            const output = document.getElementById("firestore-output");
+            if (badge) {
+                badge.textContent = "Reading...";
+                badge.className = "mono text-[10px] text-blue-400";
+            }
+
+            try {
+                const querySnapshot = await getDocs(collection(db, "users"));
+                const docs = [];
+                querySnapshot.forEach((d) => {
+                    docs.push({ id: d.id, ...d.data() });
+                });
+
+                if (output) {
+                    output.textContent = JSON.stringify({
+                        status: "Retrieved " + docs.length + " document(s)",
+                        documents: docs
+                    }, null, 2);
+                }
+                if (badge) {
+                    badge.textContent = `Read ${docs.length} docs`;
+                    badge.className = "mono text-[10px] text-emerald-400";
+                }
+            } catch (err) {
+                if (output) output.textContent = "Error getting documents: " + err.message;
+                if (badge) {
+                    badge.textContent = "Error";
+                    badge.className = "mono text-[10px] text-red-400";
+                }
+            }
         };
 
         function onUserLoggedIn(user) {
@@ -877,11 +1178,19 @@
             }
         });
 
+        const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.includes("vercel.app"))
+            ? ""
+            : "https://meteorbaseapi.vercel.app";
+        window.API_BASE = API_BASE;
+
         // Dashboard Modal Controls
         window.openDeveloperDashboard = function() {
             document.getElementById("profile-menu").classList.add("hidden");
             document.getElementById("dashboard-modal").classList.remove("hidden");
-            document.getElementById("dash-api-url").textContent = window.location.origin;
+            const apiUrl = (window.location.hostname === "localhost" || window.location.hostname.includes("vercel.app")) 
+                ? window.location.origin 
+                : "https://meteorbaseapi.vercel.app";
+            document.getElementById("dash-api-url").textContent = apiUrl;
             if (currentUser) {
                 loadUserKeys();
                 loadUserUsage();
@@ -902,7 +1211,7 @@
             spinner.classList.remove("hidden");
 
             try {
-                const res = await fetch("/api/user/keys", {
+                const res = await fetch(`${API_BASE}/api/user/keys`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -941,7 +1250,7 @@
             if (!currentUser) return;
             const container = document.getElementById("active-keys-container");
             try {
-                const res = await fetch(`/api/user/keys?user_id=${encodeURIComponent(currentUser.uid)}`);
+                const res = await fetch(`${API_BASE}/api/user/keys?user_id=${encodeURIComponent(currentUser.uid)}`);
                 if (!res.ok) return;
                 const keys = await res.json();
 
@@ -984,7 +1293,7 @@
             if (!confirm("Are you sure you want to revoke this API key? Applications using it will immediately lose access.")) return;
 
             try {
-                const res = await fetch(`/api/user/keys/${keyId}?user_id=${encodeURIComponent(currentUser.uid)}`, {
+                const res = await fetch(`${API_BASE}/api/user/keys/${keyId}?user_id=${encodeURIComponent(currentUser.uid)}`, {
                     method: "DELETE"
                 });
                 if (!res.ok) throw new Error("Failed to revoke key");
@@ -998,7 +1307,7 @@
         window.loadUserUsage = async function() {
             if (!currentUser) return;
             try {
-                const res = await fetch(`/api/user/usage?user_id=${encodeURIComponent(currentUser.uid)}`);
+                const res = await fetch(`${API_BASE}/api/user/usage?user_id=${encodeURIComponent(currentUser.uid)}`);
                 if (!res.ok) return;
                 const data = await res.json();
                 
@@ -1015,6 +1324,7 @@
     <!-- Telemetry Logic, Chart Math & Procedural Canvas -->
     <script>
         let latestTelemetry = null;
+        const API_ENDPOINT_BASE = window.API_BASE || ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.includes("vercel.app")) ? "" : "https://meteorbaseapi.vercel.app");
 
         // API PING LOGIC
         async function check(ep, statId, latId, dotId) {
@@ -1027,7 +1337,7 @@
             dot.className = 'status-dot text-blue-400 bg-current status-pulse';
 
             try {
-                const res = await fetch(ep);
+                const res = await fetch(`${API_ENDPOINT_BASE}${ep}`);
                 const latency = Math.round(performance.now() - start);
                 
                 lat.textContent = latency + 'ms';
@@ -1047,7 +1357,7 @@
 
         async function fetchTelemetryStats() {
             try {
-                const res = await fetch('/api/telemetry/stats');
+                const res = await fetch(`${API_ENDPOINT_BASE}/api/telemetry/stats`);
                 if (!res.ok) return;
                 const data = await res.json();
                 latestTelemetry = data;

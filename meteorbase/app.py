@@ -37,7 +37,7 @@ if os.path.exists(FIREBASE_CONFIG_PATH):
     except Exception as e:
         logger.warning("Failed to load firebase-applet-config.json: %s", e)
 
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", firebase_config.get("projectId", "itsjustayush"))
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", firebase_config.get("projectId", "meteorbase"))
 FIREBASE_DB_ID = os.getenv("FIREBASE_DATABASE_ID", firebase_config.get("firestoreDatabaseId", "(default)"))
 FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", firebase_config.get("apiKey", ""))
 

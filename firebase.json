@@ -1,0 +1,43 @@
+{
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "MeteorBase",
+        "supportEmail": "info.cometlabs@gmail.com",
+        "authorizedRedirectUris": [
+          "https://meteorbase.firebaseapp.com/__/auth/handler",
+          "https://meteorbase.web.app/__/auth/handler",
+          "https://meteorbaseapi.vercel.app",
+          "https://meteorbase-api.vercel.app",
+          "http://localhost:3000",
+          "http://localhost:4000",
+          "http://localhost:5173"
+        ]
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "*.py",
+      "meteorbase/**",
+      "pyproject.toml",
+      "requirements.txt",
+      "serviceAccountKey.json",
+      "firebase-applet-config.json"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

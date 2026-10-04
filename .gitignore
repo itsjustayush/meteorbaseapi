@@ -22,3 +22,11 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Firebase Secrets & Config
+firebase-applet-config.json
+serviceAccountKey.json
+service-account*.json
+*serviceAccount*.json
+*.serviceAccountKey.json
+.firebase/

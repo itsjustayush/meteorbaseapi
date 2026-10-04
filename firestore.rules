@@ -1,8 +1,160 @@
 rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId} (matches Firebase Auth UID)
+// Fields:
+//   - uid: string (required, immutable) - Firebase Auth UID
+//   - email: string (optional, max 100 chars, valid email format)
+//   - displayName: string (optional, max 100 chars)
+//   - photoURL: string (optional, max 500 chars)
+//   - first: string (optional, max 50 chars)
+//   - last: string (optional, max 50 chars)
+//   - born: number (optional, 1800..2100)
+//   - createdAt: string (optional, max 50 chars, immutable)
+//   - updatedAt: string (optional, max 50 chars)
+//
+// Collection: api_keys
+// Document ID: {keyId} (UUID)
+// Fields:
+//   - id: string (required, max 100 chars) - Unique key UUID
+//   - user_id: string (required, immutable) - Owner UID from Firebase Auth
+//   - user_email: string (optional, max 100 chars)
+//   - name: string (required, max 100 chars) - Human label for key
+//   - key_hash: string (required, 64 chars, immutable) - SHA-256 hash
+//   - key_preview: string (required, max 50 chars) - Masked preview
+//   - created_at: string (required, max 50 chars, immutable)
+//   - status: string (required, in ['active', 'revoked'])
+//   - rate_limit_per_day: number (required, positive)
+//   - rate_limit_per_min: number (required, positive)
+//   - usage_count: number (required, >= 0)
+//   - last_used_at: string (optional, max 50 chars)
+//
+// Collection: summaries
+// Document ID: {summaryId} (UUID)
+// Fields:
+//   - id: string (required, max 100 chars)
+//   - raw_text: string (required, max 50000 chars)
+//   - summary: string (required, max 10000 chars)
+//   - format_type: string (required, in ['bullets', 'paragraph'])
+//   - created_at: string (required, max 50 chars)
+//   - expires_at: string (optional, max 50 chars)
+//   - created_at_epoch: number (optional)
+//   - expires_at_epoch: number (optional)
+//   - retention_days: number (optional)
+//
+// ===============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() <= 100 &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidOptionalString(field, maxLen) {
+      return !(field in request.resource.data) ||
+        (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return (data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'first', 'last', 'born', 'createdAt', 'updatedAt'])) &&
+        data.uid is string && data.uid == request.auth.uid && data.uid.size() <= 128 &&
+        (!( 'email' in data ) || isValidEmail(data.email)) &&
+        isValidOptionalString('displayName', 100) &&
+        isValidOptionalString('photoURL', 500) &&
+        isValidOptionalString('first', 50) &&
+        isValidOptionalString('last', 50) &&
+        (!( 'born' in data ) || (data.born is number && data.born >= 1800 && data.born <= 2100)) &&
+        isValidOptionalString('createdAt', 50) &&
+        isValidOptionalString('updatedAt', 50);
+    }
+
+    function isValidApiKey(data) {
+      return data.keys().hasAll(['id', 'user_id', 'name', 'key_hash', 'key_preview', 'created_at', 'status']) &&
+        data.id is string && data.id.size() <= 100 &&
+        data.user_id is string && data.user_id == request.auth.uid &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.key_hash is string && data.key_hash.size() == 64 &&
+        data.key_preview is string && data.key_preview.size() <= 50 &&
+        data.created_at is string && data.created_at.size() <= 50 &&
+        data.status in ['active', 'revoked'] &&
+        (!( 'rate_limit_per_day' in data ) || (data.rate_limit_per_day is number && data.rate_limit_per_day >= 0)) &&
+        (!( 'rate_limit_per_min' in data ) || (data.rate_limit_per_min is number && data.rate_limit_per_min >= 0)) &&
+        (!( 'usage_count' in data ) || (data.usage_count is number && data.usage_count >= 0)) &&
+        isValidOptionalString('user_email', 100) &&
+        isValidOptionalString('last_used_at', 50);
+    }
+
+    function isValidSummary(data) {
+      return data.keys().hasAll(['id', 'raw_text', 'summary', 'format_type', 'created_at']) &&
+        data.id is string && data.id.size() <= 100 &&
+        data.raw_text is string && data.raw_text.size() <= 50000 &&
+        data.summary is string && data.summary.size() <= 10000 &&
+        data.format_type in ['bullets', 'paragraph'] &&
+        data.created_at is string && data.created_at.size() <= 50;
+    }
+
+    // ===============================================================
+    // Rules Definition
+    // ===============================================================
+
+    // Users Collection - Strict Owner Access (Protects PII)
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) &&
+        (!('uid' in resource.data) || request.resource.data.uid == resource.data.uid) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
+      allow delete: if isOwner(userId);
+    }
+
+    // API Keys Collection - Owner Managed
+    match /api_keys/{keyId} {
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create: if isAuthenticated() && isValidApiKey(request.resource.data);
+      allow update: if isAuthenticated() &&
+        resource.data.user_id == request.auth.uid &&
+        isValidApiKey(request.resource.data) &&
+        request.resource.data.user_id == resource.data.user_id &&
+        request.resource.data.key_hash == resource.data.key_hash &&
+        request.resource.data.created_at == resource.data.created_at;
+      allow delete: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+    }
+
+    // Summaries Collection - Authenticated App Access
+    match /summaries/{summaryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSummary(request.resource.data);
+      allow update: if false; // Summaries are immutable once created
+      allow delete: if isAuthenticated();
+    }
+
+    // Dynamic collections / records
+    match /{collection}/{documentId} {
+      // Default deny for unspecified collections
+      allow read, write: if false;
     }
   }
 }
