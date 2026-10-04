@@ -1,0 +1,27 @@
+# MeteorBase API & Telemetry Gateway
+
+> MeteorBase is a high-performance ASGI telemetry gateway and Python PyPI SDK built with FastAPI, Google Cloud Firestore, and Gemini AI. It provides real-time system monitoring, automated 90-day data retention cleanup, and intelligent request summarization with sub-40ms regional latency.
+
+## Core Endpoints
+- `/healthz`: Instant liveness probe reporting node status and in-memory retention telemetry.
+- `/readyz`: Readines probe verifying ASGI gateway and database availability.
+- `/ping`: Service acknowledgment endpoint with non-blocking 90-day retention evaluation.
+- `/api/test`: Ultra-low latency static connectivity probe.
+- `/summarize`: AI summarization engine powered by Google Gemini for request logs and telemetry payloads.
+- `/api/telemetry/stats`: Compressed 24-hour rolling activity stream with latency histograms and 90-day uptime records.
+- `/public-docs`: Interactive OpenAPI 3.1 specification for public SDK developers.
+
+## PyPI SDK Integration
+```python
+from meteorbase import MeteorBaseClient
+
+client = MeteorBaseClient(api_key="your_api_key", base_url="https://meteorbaseapi.vercel.app")
+status = client.health_check()
+print(status)
+```
+
+## Performance & Architecture
+- Edge Deployment: Hosted on Vercel's Mumbai (`bom1`) node for sub-50ms latency.
+- Non-blocking I/O: Background tasks execute database maintenance without delaying HTTP responses.
+- Security: Zero-trust bearer token authentication and strict Firestore security rules.
+- Optional Full LLM Reference: https://meteorbaseapi.vercel.app/llms-full.txt

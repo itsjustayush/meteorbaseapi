@@ -1,0 +1,22 @@
+# MeteorBase API - Full System Architecture & Specifications
+
+## Overview
+MeteorBase provides real-time API monitoring, request velocity telemetry, and intelligent summarization for modern cloud native workloads. Built on FastAPI and Google Cloud Firestore, the gateway is designed to run statelessly on serverless edge nodes while maintaining millisecond responsiveness.
+
+## Key Capabilities
+1. Real-Time Telemetry: Rolling 24-hour activity streaming, request velocity charts, and uptime monitoring.
+2. 90-Day Retention Policy: Automated non-blocking database cleanup ensuring data older than 90 days is purged to optimize storage costs and query speeds.
+3. Gemini AI Summarizer: Native integration with Google Gemini Flash for extracting insights from request payloads and logs.
+4. Python PyPI SDK: Official SDK package `meteorbase` offering synchronous and asynchronous clients with connection pooling and automatic retries.
+
+## Authentication Model
+- Public Probes: `/healthz`, `/readyz`, `/ping`, and `/api/test` require no authentication for monitoring.
+- Telemetry & AI: `/summarize` and secured data endpoints require an `Authorization: Bearer <API_KEY>` header.
+- Admin Docs: Private master OpenAPI `/docs` is secured via HTTP Basic Authentication.
+- Public Docs: Safe, filtered Swagger UI is accessible at `/public-docs`.
+
+## Contact & Links
+- Website: https://meteorbaseapi.vercel.app/
+- Public Docs: https://meteorbaseapi.vercel.app/public-docs
+- PyPI Package: https://pypi.org/project/meteorbase/
+- GitHub: https://github.com/itsjustayush/meteorbaseapi

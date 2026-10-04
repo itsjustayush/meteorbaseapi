@@ -3,10 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MeteorBase API | System Telemetry</title>
-    <meta name="description" content="MeteorBase API - Real-time system telemetry, latency monitoring, and task management API with OpenAPI documentation.">
-    <meta property="og:title" content="MeteorBase API | System Telemetry">
-    <meta property="og:description" content="MeteorBase API - Real-time system telemetry, latency monitoring, and task management API with OpenAPI documentation.">
+    <title>MeteorBase API | Real-Time Telemetry & Gateway</title>
+    <meta name="description" content="MeteorBase API provides high-performance real-time telemetry, automated 90-day retention policies, and intelligent AI summaries with sub-50ms latency.">
+    <link rel="canonical" href="https://meteorbaseapi.vercel.app/">
+    <meta name="google-site-verification" content="googlef3ede2e6a203d469">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://meteorbaseapi.vercel.app/">
+    <meta property="og:title" content="MeteorBase API | Real-Time Telemetry & Gateway">
+    <meta property="og:description" content="MeteorBase API provides high-performance real-time telemetry, automated 90-day retention policies, and intelligent AI summaries with sub-50ms latency.">
+    <meta property="og:image" content="https://meteorbaseapi.vercel.app/banner.png">
+    <meta property="og:site_name" content="MeteorBase">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://meteorbaseapi.vercel.app/">
+    <meta name="twitter:title" content="MeteorBase API | Real-Time Telemetry & Gateway">
+    <meta name="twitter:description" content="MeteorBase API provides high-performance real-time telemetry, automated 90-day retention policies, and intelligent AI summaries with sub-50ms latency.">
+    <meta name="twitter:image" content="https://meteorbaseapi.vercel.app/banner.png">
+
+    <!-- Structured Data (JSON-LD for AEO & Search Engines) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://meteorbaseapi.vercel.app/#organization",
+          "name": "MeteorBase",
+          "url": "https://meteorbaseapi.vercel.app/",
+          "logo": "https://meteorbaseapi.vercel.app/logo.png"
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://meteorbaseapi.vercel.app/#webpage",
+          "url": "https://meteorbaseapi.vercel.app/",
+          "name": "MeteorBase API | Real-Time Telemetry & Gateway",
+          "isPartOf": { "@id": "https://meteorbaseapi.vercel.app/#organization" },
+          "datePublished": "2026-10-01T00:00:00Z",
+          "dateModified": "2026-10-04T15:00:00Z",
+          "description": "MeteorBase API provides high-performance real-time telemetry, automated 90-day retention policies, and intelligent AI summaries with sub-50ms latency.",
+          "author": {
+            "@type": "Person",
+            "name": "Ayush"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": "https://meteorbaseapi.vercel.app/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Documentation",
+              "item": "https://meteorbaseapi.vercel.app/public-docs"
+            }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How does MeteorBase achieve sub-40ms telemetry latency?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "MeteorBase deploys to Vercel's Mumbai (bom1) regional edge node, utilizes in-memory ASGI telemetry caching, and non-blocking background tasks to eliminate database query stalls."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is the automated 90-day retention cleanup policy?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Every telemetry record and log is timestamped upon ingestion. An asynchronous background evaluator identifies expired documents and purges records older than 90 days."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I integrate the MeteorBase Python SDK with FastAPI?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Install meteorbase via pip, initialize MeteorBaseClient with your API key, and call verify_key() or get_telemetry() directly from your services."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does Google Gemini AI summarization work in MeteorBase?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The /summarize endpoint routes telemetry and arbitrary text through Gemini 3.6 Flash with optimized prompts to produce instant structured insights."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,20 +116,21 @@
         body { font-family: 'Space Grotesk', sans-serif; background-color: #05070a; color: #ecece8; overflow-x: hidden; }
         .mono { font-family: 'JetBrains Mono', monospace; }
 
-        /* Liquid Glass Panels */
+        /* Liquid Glass Panels - Hardware Accelerated */
         .glass-panel {
             background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
             border: 1px solid rgba(255, 255, 255, 0.06);
-            box-shadow: 0 30px 64px -26px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(16px) saturate(180%);
-            -webkit-backdrop-filter: blur(16px) saturate(180%);
-            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow: 0 20px 48px -20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transform: translateZ(0);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, background 0.25s ease;
         }
         .glass-panel:hover {
             border-color: rgba(255, 255, 255, 0.14);
             background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-            box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            transform: translateY(-3px);
+            box-shadow: 0 28px 56px -16px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px) translateZ(0);
         }
 
         /* btn-2 component styling */
@@ -111,17 +211,17 @@
             color: transparent;
         }
 
-        /* Ambient Aurora Background */
+        /* Ambient Aurora Background - 100% Hardware Accelerated (Zero GPU blur penalty) */
         .aurora-bg {
             position: fixed;
-            inset: -20%;
+            inset: 0;
             z-index: -2;
             background: 
-                radial-gradient(circle at 20% 30%, rgba(18, 120, 255, 0.15), transparent 40%),
-                radial-gradient(circle at 80% 20%, rgba(56, 220, 214, 0.1), transparent 50%),
-                radial-gradient(circle at 50% 80%, rgba(228, 75, 60, 0.1), transparent 50%);
-            filter: blur(65px);
-            animation: auroraDrift 20s linear infinite alternate;
+                radial-gradient(circle at 20% 30%, rgba(18, 120, 255, 0.16) 0%, transparent 60%),
+                radial-gradient(circle at 80% 20%, rgba(56, 220, 214, 0.10) 0%, transparent 55%),
+                radial-gradient(circle at 50% 80%, rgba(228, 75, 60, 0.09) 0%, transparent 55%);
+            pointer-events: none;
+            transform: translateZ(0);
         }
 
         /* Entrance Animations */
@@ -196,6 +296,10 @@
                 </div>
                 <span class="mono text-[11px] text-gray-400 tracking-wider uppercase whitespace-nowrap">Telemetry</span>
             </div>
+        <!-- Quick Navigation Links -->
+        <div class="hidden md:flex items-center gap-3.5 text-xs mono border-r border-white/10 pr-3.5">
+            <a href="/public-docs" class="text-gray-300 hover:text-cyan-400 transition-colors">Docs</a>
+            <a href="/login" class="text-gray-300 hover:text-white transition-colors">Portal</a>
         </div>
 
         <!-- 2nd div: Auth / Profile Container (div#auth-header-container) -->
@@ -417,14 +521,14 @@
             </div>
 
             <!-- Interactive Docs -->
-            <a href="/docs" class="glass-panel rounded-3xl p-6 stagger-up delay-4 flex flex-col justify-between h-44 group cursor-pointer border border-blue-500/30 hover:border-blue-400/80">
+            <a href="/public-docs" class="glass-panel rounded-3xl p-6 stagger-up delay-4 flex flex-col justify-between h-44 group cursor-pointer border border-cyan-500/30 hover:border-cyan-400/80">
                 <div class="flex justify-between items-start">
-                    <h2 class="mono text-sm text-blue-400 tracking-widest uppercase">Swagger UI</h2>
-                    <svg class="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    <h2 class="mono text-sm text-cyan-400 tracking-widest uppercase">OpenAPI 3.1 Specs</h2>
+                    <svg class="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </div>
                 <div>
-                    <p class="text-xl font-bold text-white mb-1">Open OAS 3.1</p>
-                    <p class="mono text-xs text-gray-500">Interactive Environment</p>
+                    <p class="text-xl font-bold text-white mb-1">Public Docs</p>
+                    <p class="mono text-xs text-gray-500">Interactive SDK & API Reference</p>
                 </div>
             </a>
         </div>
@@ -585,6 +689,89 @@
                 <span>90 days ago</span>
                 <span class="hidden sm:inline text-gray-400">100.0% operational over 90 days</span>
                 <span>Today</span>
+            </div>
+        </section>
+
+        <!-- Architectural FAQ & Answer Engine Optimization Section -->
+        <section id="faq-section" class="glass-panel rounded-3xl p-6 sm:p-8 stagger-up delay-4 space-y-8">
+            <div class="border-b border-white/5 pb-4">
+                <div class="mono text-xs text-cyan-400 tracking-widest uppercase">Knowledge & Architecture</div>
+                <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">Frequently Asked Questions</h2>
+                <p class="text-gray-400 text-sm font-light mt-1">Key answers and architectural specifications for AI answer engines and developers.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-300">
+                <!-- QA Item 1 -->
+                <article class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <span class="text-cyan-400">Q:</span> How does MeteorBase achieve sub-40ms telemetry latency?
+                    </h3>
+                    <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+                        MeteorBase is deployed directly to Vercel's Mumbai (bom1) regional datacenter, avoiding cross-oceanic fiber transit delays for regional callers. Probes such as /healthz and /readyz rely on in-memory ASGI telemetry caching and background tasks rather than blocking on synchronous database queries.
+                    </p>
+                    <ul class="list-disc list-inside text-xs text-gray-400 space-y-1 pt-1">
+                        <li>Regional bom1 Serverless execution environment</li>
+                        <li>Non-blocking FastAPI BackgroundTasks for heavy I/O</li>
+                        <li>GZip payload compression reducing transfer sizes by 90%</li>
+                    </ul>
+                </article>
+
+                <!-- QA Item 2 -->
+                <article class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <span class="text-cyan-400">Q:</span> What is the automated 90-day retention cleanup policy?
+                    </h3>
+                    <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+                        MeteorBase automatically enforces strict data life-cycle management. Every telemetry log and request sample receives a UTC timestamp. An asynchronous retention cleaner regularly checks active collections and safely deletes records exceeding the 90-day retention window.
+                    </p>
+                    <ul class="list-disc list-inside text-xs text-gray-400 space-y-1 pt-1">
+                        <li>Automated purging of expired telemetry data</li>
+                        <li>Zero-downtime background execution with throttled checkpoints</li>
+                        <li>Guaranteed compliance with storage limits on free cloud tiers</li>
+                    </ul>
+                </article>
+
+                <!-- QA Item 3 -->
+                <article class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <span class="text-cyan-400">Q:</span> How do I integrate the MeteorBase Python SDK with FastAPI?
+                    </h3>
+                    <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+                        You can install the official package directly from PyPI using pip install meteorbase. The SDK provides both synchronous and asynchronous clients with built-in connection pooling via HTTPX and automatic exponential backoff retries.
+                    </p>
+                    <ul class="list-disc list-inside text-xs text-gray-400 space-y-1 pt-1">
+                        <li>from meteorbase import MeteorBaseClient, AsyncMeteorBaseClient</li>
+                        <li>Automatic token verification and rate-limit enforcement</li>
+                        <li>Thread-safe session management with connection reuse</li>
+                    </ul>
+                </article>
+
+                <!-- QA Item 4 -->
+                <article class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <span class="text-cyan-400">Q:</span> How does Google Gemini AI summarization work?
+                    </h3>
+                    <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+                        The /summarize endpoint routes requests directly to Google Gemini 3.6 Flash. It condenses complex error traces, high-velocity activity logs, and technical payloads into scannable markdown bullet points or paragraphs in sub-second response times.
+                    </p>
+                    <ul class="list-disc list-inside text-xs text-gray-400 space-y-1 pt-1">
+                        <li>Structured JSON and markdown bullet summarization formats</li>
+                        <li>Customizable temperature, max tokens, and system instructions</li>
+                        <li>Cached model instances minimizing cold-start latency</li>
+                    </ul>
+                </article>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-4 text-xs text-gray-400">
+                <div class="flex items-center gap-4">
+                    <a href="/public-docs" class="text-cyan-400 hover:underline">Interactive Public Docs →</a>
+                    <a href="/login" class="text-gray-300 hover:text-white">Developer Sign In Portal →</a>
+                    <a href="/llms.txt" class="text-gray-400 hover:text-gray-200 mono">llms.txt</a>
+                </div>
+                <div class="mono text-gray-500">
+                    Last modified: 2026-10-04 • Specification: OAS 3.1
+                </div>
             </div>
         </section>
     </main>
@@ -1586,20 +1773,27 @@
             }
         }
 
+        let isTabActive = true;
+        document.addEventListener('visibilitychange', () => {
+            isTabActive = !document.hidden;
+            if (isTabActive) requestAnimationFrame(animateParticles);
+        });
+
         function initParticles() {
             particles = [];
-            const count = window.innerWidth < 768 ? 50 : 150;
+            const count = window.innerWidth < 768 ? 20 : 40;
             for (let i = 0; i < count; i++) {
                 particles.push(new Particle());
             }
         }
 
         function animateParticles() {
+            if (!isTabActive) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
             requestAnimationFrame(animateParticles);
         }
 

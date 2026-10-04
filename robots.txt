@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Disallow: /docs
+Disallow: /openapi.json
+
+# Explicitly enable AI Answer Engines for high AEO visibility
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://meteorbaseapi.vercel.app/sitemap.xml

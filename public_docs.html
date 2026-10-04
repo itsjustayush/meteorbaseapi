@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MeteorBase API | Public Documentation</title>
+    <meta name="description" content="Interactive OpenAPI 3.1 specification and endpoint reference for the MeteorBase real-time telemetry gateway and Python SDK.">
+    <link rel="canonical" href="https://meteorbaseapi.vercel.app/public-docs">
+    <meta name="google-site-verification" content="googlef3ede2e6a203d469">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://meteorbaseapi.vercel.app/public-docs">
+    <meta property="og:title" content="MeteorBase API | Public Documentation">
+    <meta property="og:description" content="Explore interactive endpoints and documentation for the MeteorBase high-velocity telemetry gateway and Python SDK.">
+    <meta property="og:image" content="https://meteorbaseapi.vercel.app/banner.png">
+    <meta property="og:site_name" content="MeteorBase">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://meteorbaseapi.vercel.app/public-docs">
+    <meta name="twitter:title" content="MeteorBase API | Public Documentation">
+    <meta name="twitter:description" content="Explore interactive endpoints and documentation for the MeteorBase high-velocity telemetry gateway and Python SDK.">
+    <meta name="twitter:image" content="https://meteorbaseapi.vercel.app/banner.png">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "MeteorBase Public API Specification & SDK Docs",
+      "description": "Interactive OpenAPI documentation covering real-time telemetry, Gemini summarization, and health probes.",
+      "author": {
+        "@type": "Person",
+        "name": "Ayush"
+      },
+      "datePublished": "2026-10-04T12:00:00Z",
+      "dateModified": "2026-10-04T15:00:00Z",
+      "publisher": {
+        "@type": "Organization",
+        "name": "MeteorBase",
+        "url": "https://meteorbaseapi.vercel.app/"
+      }
+    }
+    </script>
+
+    <!-- Google Fonts & Swagger UI Assets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+
+    <style>
+        :root {
+            --bg-base: #05070a;
+            --panel-bg: rgba(255, 255, 255, 0.03);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #38dcd6;
+            --accent-blue: #1278ff;
+            --text-main: #ecece8;
+            --text-muted: #8e95a5;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Top Nav Header */
+        header {
+            background: rgba(5, 7, 10, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: inherit;
+        }
+        .brand-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 12px var(--accent-cyan);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: #fff; }
+        .pill-badge {
+            background: rgba(56, 220, 214, 0.1);
+            border: 1px solid rgba(56, 220, 214, 0.25);
+            color: var(--accent-cyan);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Banner */
+        .intro-banner {
+            max-width: 1200px;
+            margin: 2rem auto 1rem;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+            border: 1px solid var(--border-color);
+            border-radius: 1.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .intro-banner h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, #a0aec0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .intro-banner p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+            max-width: 650px;
+        }
+
+        /* Swagger Container Customization (Dark Theme) */
+        #swagger-ui {
+            max-width: 1200px;
+            margin: 0 auto 3rem;
+            padding: 0 1rem;
+        }
+        .swagger-ui {
+            color: var(--text-main) !important;
+            font-family: 'Space Grotesk', sans-serif !important;
+        }
+        .swagger-ui .info { margin: 20px 0 !important; }
+        .swagger-ui .info .title { color: #fff !important; font-family: 'Space Grotesk', sans-serif; }
+        .swagger-ui .scheme-container { background: transparent !important; box-shadow: none !important; padding: 10px 0 !important; }
+        .swagger-ui .opblock {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            margin-bottom: 12px !important;
+            box-shadow: 0 4px 20px -8px rgba(0,0,0,0.5) !important;
+        }
+        .swagger-ui .opblock .opblock-summary { border-color: transparent !important; }
+        .swagger-ui .opblock .opblock-summary-method {
+            border-radius: 6px !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-weight: 600 !important;
+        }
+        .swagger-ui .opblock .opblock-summary-path { color: #fff !important; font-family: 'JetBrains Mono', monospace !important; }
+        .swagger-ui .opblock .opblock-summary-description { color: var(--text-muted) !important; font-size: 13px !important; }
+        .swagger-ui .opblock-body { background: rgba(0, 0, 0, 0.2) !important; }
+        .swagger-ui .btn { border-radius: 8px !important; font-family: 'Space Grotesk', sans-serif !important; }
+        .swagger-ui table thead tr th { color: #fff !important; border-bottom: 1px solid var(--border-color) !important; }
+        .swagger-ui table tbody tr td { color: var(--text-muted) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important; }
+        .swagger-ui .prop-type, .swagger-ui .parameter__name, .swagger-ui .response-col_status { font-family: 'JetBrains Mono', monospace !important; }
+        .swagger-ui section.models {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+        }
+        .swagger-ui section.models h4 { color: #fff !important; }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/" class="brand">
+            <span class="brand-dot"></span>
+            <span style="font-weight: 700; font-size: 1.15rem; letter-spacing: -0.02em;">MeteorBase</span>
+            <span class="pill-badge">Public Docs</span>
+        </a>
+        <nav class="nav-links">
+            <a href="/">← Monitor</a>
+            <a href="/login">Portal</a>
+            <a href="/llms.txt" class="mono">llms.txt</a>
+            <a href="https://pypi.org/project/meteorbase/" target="_blank" rel="noopener">PyPI SDK ↗</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="intro-banner">
+            <div>
+                <h1>MeteorBase Public SDK & Telemetry API</h1>
+                <p>Curated and filtered interactive API reference. Internal authentication tokens and administrative paths are omitted from this document.</p>
+            </div>
+            <div>
+                <a href="/" style="display: inline-block; padding: 0.6rem 1.2rem; background: rgba(56, 220, 214, 0.15); border: 1px solid rgba(56, 220, 214, 0.3); border-radius: 8px; color: var(--accent-cyan); text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                    Live Telemetry Grid →
+                </a>
+            </div>
+        </div>
+
+        <div id="swagger-ui"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                url: "/public-openapi.json",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.SwaggerUIStandalonePreset
+                ],
+                layout: "BaseLayout"
+            });
+        };
+    </script>
+</body>
+</html>

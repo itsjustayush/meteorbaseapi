@@ -31,7 +31,14 @@
       "pyproject.toml",
       "requirements.txt",
       "serviceAccountKey.json",
-      "firebase-applet-config.json"
+      "firebase-applet-config.json",
+      "package.json",
+      "package-lock.json",
+      "README.md",
+      "metadata.json",
+      "firebase-blueprint.json",
+      "firestore.rules",
+      "vercel.json"
     ],
     "rewrites": [
       {

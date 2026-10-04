@@ -14,10 +14,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import httpx
-from fastapi import FastAPI, HTTPException, Security, Depends, Query, status, Request, Response, Header
+from fastapi import FastAPI, HTTPException, Security, Depends, Query, status, Request, Response, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import APIKeyHeader
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.security import APIKeyHeader, HTTPBasic, HTTPBasicCredentials
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field, ConfigDict
 
 # Setup logging
@@ -204,6 +206,30 @@ def verify_and_cleanup_database(collections: list[str] | None = None) -> dict[st
         "active_records": active_count,
         "retention_days": RETENTION_DAYS,
     }
+
+
+_last_cleanup_timestamp = 0.0
+_cached_cleanup_result: dict[str, Any] = {
+    "checked_at": datetime.now(timezone.utc).isoformat(),
+    "total_checked": 0,
+    "expired_deleted": 0,
+    "active_records": 0,
+    "retention_days": RETENTION_DAYS,
+}
+
+def get_or_run_retention_check(force: bool = False) -> dict[str, Any]:
+    global _last_cleanup_timestamp, _cached_cleanup_result
+    now_ts = time.time()
+    if not force and (now_ts - _last_cleanup_timestamp < 600) and _cached_cleanup_result.get("checked_at"):
+        return _cached_cleanup_result
+    try:
+        res = verify_and_cleanup_database()
+        _cached_cleanup_result = res
+        _last_cleanup_timestamp = now_ts
+        return res
+    except Exception as e:
+        logger.warning("Error running retention cleanup: %s", e)
+        return _cached_cleanup_result
 
 
 # Initialize Gemini Client
@@ -482,7 +508,12 @@ class TelemetryStore:
         })
         if len(self.history) > 1000:
             self.history = self.history[-1000:]
-        self.save()
+        now_ts = now.timestamp()
+        if not hasattr(self, "last_saved_time"):
+            self.last_saved_time = 0.0
+        if now_ts - self.last_saved_time > 30.0:
+            self.last_saved_time = now_ts
+            self.save()
 
     def get_stats(self) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
@@ -549,12 +580,31 @@ class TelemetryStore:
 
 telemetry_store = TelemetryStore()
 
-# FastAPI Initialization
+# FastAPI Initialization - Disable default public open docs to support password protection
 app = FastAPI(
     title="MeteorBase API",
     description="Flexible, Supabase & Firebase-backed API with Gemini Summarizer, automated 90-day retention, and real-time telemetry.",
     version="2.1.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
+
+# Admin Basic Auth for Private Docs
+admin_security = HTTPBasic()
+
+def authenticate_admin(credentials: HTTPBasicCredentials = Depends(admin_security)):
+    admin_user = os.getenv("ADMIN_USERNAME", "admin")
+    admin_pass = os.getenv("ADMIN_PASSWORD", "meteorbase2026!")
+    correct_username = secrets.compare_digest(credentials.username.encode("utf8"), admin_user.encode("utf8"))
+    correct_password = secrets.compare_digest(credentials.password.encode("utf8"), admin_pass.encode("utf8"))
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect admin credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 @app.middleware("http")
 async def track_telemetry_middleware(request: Request, call_next):
@@ -578,6 +628,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 # Flexible Request Model
@@ -590,9 +641,110 @@ class SummarizeRequest(BaseModel):
 
 
 # Root UI endpoint
-@app.get("/", response_class=FileResponse)
+@app.get("/", response_class=FileResponse, include_in_schema=False)
 async def root():
     return "index.html"
+
+
+# Split-screen Auth UI
+@app.get("/login", response_class=FileResponse, include_in_schema=False)
+async def login_page():
+    return "login.html"
+
+
+# SEO & Verification Endpoints
+@app.get("/robots.txt", include_in_schema=False)
+async def get_robots():
+    return FileResponse("robots.txt", media_type="text/plain")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def get_sitemap():
+    return FileResponse("sitemap.xml", media_type="application/xml")
+
+
+@app.get("/llms.txt", include_in_schema=False)
+async def get_llms():
+    return FileResponse("llms.txt", media_type="text/plain")
+
+
+@app.get("/llms-full.txt", include_in_schema=False)
+async def get_llms_full():
+    return FileResponse("llms-full.txt", media_type="text/plain")
+
+
+@app.get("/googlef3ede2e6a203d469.html", response_class=PlainTextResponse, include_in_schema=False)
+def google_verification():
+    return "google-site-verification: googlef3ede2e6a203d469.html"
+
+
+# Password-Protected Master Documentation
+@app.get("/docs", include_in_schema=False)
+async def get_private_docs(username: str = Depends(authenticate_admin)):
+    html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MeteorBase API | Private Master Docs</title>
+    <meta name="description" content="Private Master OpenAPI 3.1 specification for MeteorBase backend engineers.">
+    <link rel="canonical" href="https://meteorbaseapi.vercel.app/docs">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <style>
+        body { margin: 0; background: #05070a; color: #fff; }
+        .swagger-ui .topbar { display: none; }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                url: "/openapi.json",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.SwaggerUIStandalonePreset
+                ],
+                layout: "BaseLayout"
+            });
+        };
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_private_openapi(username: str = Depends(authenticate_admin)):
+    return get_openapi(title="MeteorBase Master API", version="2.1.0", routes=app.routes)
+
+
+# Public Filtered Documentation (Curated for Developers & PyPI SDK)
+@app.get("/public-docs", include_in_schema=False)
+async def get_public_docs():
+    return FileResponse("public_docs.html")
+
+
+@app.get("/public-openapi.json", include_in_schema=False)
+async def get_public_openapi():
+    full_schema = get_openapi(title="MeteorBase Public SDK & Telemetry API", version="2.1.0", routes=app.routes)
+    blacklisted_paths = {
+        "/api/auth/me",
+        "/api/user/keys",
+        "/api/user/keys/revoke",
+        "/api/user/usage",
+        "/docs",
+        "/openapi.json"
+    }
+    public_paths = {
+        path: item for path, item in full_schema.get("paths", {}).items()
+        if path not in blacklisted_paths and not path.startswith("/admin")
+    }
+    full_schema["paths"] = public_paths
+    return full_schema
 
 
 # --- NEW: SDK Client Authentication / User Info Endpoint ---
@@ -713,23 +865,27 @@ def summarize_health() -> dict[str, Any]:
 
 
 @app.get("/ping", tags=["telemetry"])
-def ping() -> dict[str, Any]:
-    cleanup_result = verify_and_cleanup_database()
+def ping(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    now_ts = time.time()
+    if now_ts - _last_cleanup_timestamp >= 600:
+        background_tasks.add_task(get_or_run_retention_check)
     return {
         "service": SERVICE_NAME,
         "status": "ok",
         "message": "Ping acknowledged. 90-day retention timestamps verified.",
-        "telemetry": cleanup_result,
+        "telemetry": _cached_cleanup_result,
     }
 
 
 @app.get("/healthz", tags=["telemetry"])
-def healthz() -> dict[str, Any]:
-    cleanup_result = verify_and_cleanup_database()
+def healthz(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    now_ts = time.time()
+    if now_ts - _last_cleanup_timestamp >= 600:
+        background_tasks.add_task(get_or_run_retention_check)
     return {
         "service": SERVICE_NAME,
         "status": "ok",
-        "telemetry": cleanup_result,
+        "telemetry": _cached_cleanup_result,
     }
 
 

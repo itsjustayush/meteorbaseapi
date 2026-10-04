@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MeteorBase | Sign In & Developer Portal</title>
+    <meta name="description" content="Sign in to your MeteorBase developer console to manage API keys, explore live telemetry velocity, and configure retention policies.">
+    <link rel="canonical" href="https://meteorbaseapi.vercel.app/login">
+    <meta name="google-site-verification" content="googlef3ede2e6a203d469">
+
+    <!-- OpenGraph & Twitter -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://meteorbaseapi.vercel.app/login">
+    <meta property="og:title" content="MeteorBase | Sign In & Developer Portal">
+    <meta property="og:description" content="Secure developer authentication portal for MeteorBase API & Telemetry Gateway.">
+    <meta property="og:image" content="https://meteorbaseapi.vercel.app/banner.png">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase Web SDK (v10 compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #05070a;
+            --accent-cyan: #38dcd6;
+            --accent-blue: #1278ff;
+            --accent-orange: #ff5722;
+        }
+        body {
+            background-color: var(--bg-dark);
+            color: #ecece8;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-x: hidden;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Liquid Gradients & Canvas */
+        .ambient-glow {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(18, 120, 255, 0.12) 0%, rgba(56, 220, 214, 0.05) 50%, transparent 70%);
+            pointer-events: none;
+            filter: blur(40px);
+            transform: translateZ(0);
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        /* Interactive Inputs */
+        .auth-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 0.85rem 1rem;
+            border-radius: 0.65rem;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 0 2px rgba(56, 220, 214, 0.2);
+        }
+
+        /* Gradient Text */
+        .text-gradient {
+            background: linear-gradient(135deg, #ffffff 30%, #38dcd6 80%, #1278ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Carbon Texture Grid on Left Side */
+        .carbon-pattern {
+            background-image: 
+                radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+                radial-gradient(rgba(56, 220, 214, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px;
+            background-position: 0 0, 12px 12px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-screen">
+        
+        <!-- LEFT SHOWCASE PANEL (Inspired by Neon & HydraDB) -->
+        <div class="lg:col-span-6 relative flex flex-col justify-between p-8 sm:p-14 lg:p-16 border-b lg:border-b-0 lg:border-r border-white/5 carbon-pattern overflow-hidden">
+            <div class="ambient-glow -top-24 -left-24"></div>
+            <div class="ambient-glow bottom-0 right-0 opacity-40"></div>
+
+            <!-- Top Left Brand -->
+            <div class="relative z-10 flex items-center justify-between">
+                <a href="/" class="flex items-center gap-3 group">
+                    <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center font-bold text-black text-lg shadow-lg shadow-cyan-500/20">
+                        ⚡
+                    </span>
+                    <span class="text-xl font-bold tracking-tight text-white group-hover:text-cyan-400 transition-colors">MeteorBase</span>
+                    <span class="mono text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">API Console</span>
+                </a>
+            </div>
+
+            <!-- Middle Value Proposition -->
+            <div class="relative z-10 my-12 lg:my-0 max-w-xl">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 mono mb-6">
+                    <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                    Production Telemetry Node
+                </div>
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-6">
+                    The High-Velocity <br/>
+                    <span class="text-gradient">Telemetry Gateway</span><br/>
+                    Built for AI.
+                </h1>
+                <p class="text-gray-400 text-base sm:text-lg leading-relaxed mb-8">
+                    Monitor multi-node health in real-time, execute non-blocking 90-day retention policies, and generate autonomous payload summaries with Gemini Flash.
+                </p>
+
+                <!-- Feature Badges Grid (HydraDB Inspo) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mono text-xs">
+                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                        <span class="text-emerald-400 text-sm">●</span>
+                        <div>
+                            <p class="font-bold text-gray-200">Sub-15ms Latency</p>
+                            <p class="text-gray-500 text-[11px]">Regional bom1 Edge Node</p>
+                        </div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                        <span class="text-cyan-400 text-sm">●</span>
+                        <div>
+                            <p class="font-bold text-gray-200">90-Day Retention</p>
+                            <p class="text-gray-500 text-[11px]">Non-blocking Auto Cleanup</p>
+                        </div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                        <span class="text-blue-400 text-sm">●</span>
+                        <div>
+                            <p class="font-bold text-gray-200">OpenAS 3.1 & PyPI</p>
+                            <p class="text-gray-500 text-[11px]">Full Sync/Async SDK</p>
+                        </div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                        <span class="text-purple-400 text-sm">●</span>
+                        <div>
+                            <p class="font-bold text-gray-200">Zero-Cost Tier</p>
+                            <p class="text-gray-500 text-[11px]">Spark + Vercel Optimized</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Left Telemetry Status -->
+            <div class="relative z-10 flex items-center justify-between text-xs text-gray-500 border-t border-white/5 pt-6">
+                <span>Network Node: <strong class="text-gray-300 mono">ap-south-1 (Mumbai)</strong></span>
+                <span class="mono text-emerald-400 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>All Systems Nominal
+                </span>
+            </div>
+        </div>
+
+        <!-- RIGHT AUTH PANEL (Inspired by Supabase & Neon) -->
+        <div class="lg:col-span-6 flex items-center justify-center p-6 sm:p-12 lg:p-16 relative bg-[#040608]">
+            <div class="ambient-glow top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-25"></div>
+
+            <div class="w-full max-w-md relative z-10 space-y-6">
+                
+                <!-- Back Link -->
+                <div class="flex items-center justify-between">
+                    <a href="/" class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        <span>Home</span>
+                    </a>
+                    <a href="/public-docs" class="text-xs text-cyan-400 hover:underline mono">API Specs →</a>
+                </div>
+
+                <!-- Auth Mode Switcher (Tab pills) -->
+                <div class="flex items-center justify-center p-1 rounded-xl bg-white/[0.03] border border-white/10">
+                    <button id="tab-signin" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-xs font-semibold rounded-lg transition-all text-white bg-white/10 shadow">
+                        Sign In
+                    </button>
+                    <button id="tab-signup" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-xs font-semibold rounded-lg transition-all text-gray-400 hover:text-white">
+                        Create Account
+                    </button>
+                </div>
+
+                <!-- Header Title -->
+                <div>
+                    <h2 id="auth-title" class="text-2xl sm:text-3xl font-bold tracking-tight text-white">Sign in to your account</h2>
+                    <p id="auth-subtitle" class="text-sm text-gray-400 mt-1">Access your live telemetry dashboard and manage API tokens.</p>
+                </div>
+
+                <!-- Social OAuth Buttons -->
+                <div class="space-y-3">
+                    <button onclick="handleGoogleSignIn()" class="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-sm font-medium text-white transition-all shadow-sm">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.64v3.03h3.88c2.28-2.09 3.66-5.17 3.66-9.11z"/>
+                            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.27 21.43 7.35 24 12 24z"/>
+                            <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.43l4.03-3.14z"/>
+                            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.27 2.57 1.25 6.57l4.03 3.14c.95-2.83 3.6-4.96 6.72-4.96z"/>
+                        </svg>
+                        <span>Continue with Google</span>
+                    </button>
+
+                    <button onclick="handleGithubSignIn()" class="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-sm font-medium text-white transition-all shadow-sm">
+                        <svg class="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        <span>Continue with GitHub</span>
+                    </button>
+                </div>
+
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-white/10"></div>
+                    <span class="flex-shrink mx-4 text-xs uppercase tracking-wider text-gray-500 mono">Or continue with Email</span>
+                    <div class="flex-grow border-t border-white/10"></div>
+                </div>
+
+                <!-- Form Fields -->
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                    <div id="name-group" class="hidden space-y-1.5">
+                        <label class="block text-xs font-semibold text-gray-300">Display Name</label>
+                        <input id="auth-name" type="text" placeholder="Ada Lovelace" class="auth-input">
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-gray-300">Email Address</label>
+                        <input id="auth-email" type="email" required placeholder="developer@meteorbase.dev" class="auth-input">
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-xs font-semibold text-gray-300">Password</label>
+                            <a href="#" onclick="handlePasswordReset(event)" class="text-[11px] text-gray-400 hover:text-cyan-400 transition-colors">Forgot?</a>
+                        </div>
+                        <div class="relative">
+                            <input id="auth-password" type="password" required placeholder="••••••••••••" class="auth-input pr-10">
+                            <button type="button" onclick="togglePasswordVis()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+                                <svg id="eye-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div id="auth-error" class="hidden p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 mono"></div>
+
+                    <!-- Submit Button -->
+                    <button id="auth-submit-btn" type="submit" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-semibold text-sm transition-all shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2">
+                        <span id="btn-text">Sign In →</span>
+                        <span id="auth-spinner" class="hidden w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                    </button>
+                </form>
+
+                <!-- Footer Terms -->
+                <p class="text-xs text-center text-gray-500 leading-relaxed">
+                    By accessing MeteorBase, you agree to our <a href="#" class="text-gray-400 hover:text-white underline">Terms of Service</a> and <a href="#" class="text-gray-400 hover:text-white underline">Privacy Policy</a>.
+                </p>
+
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let isSignUpMode = false;
+
+        // Firebase Initialization with config fallback
+        const firebaseConfig = {
+            apiKey: window.FIREBASE_API_KEY || "",
+            authDomain: "meteorbase.firebaseapp.com",
+            projectId: "meteorbase",
+            storageBucket: "meteorbase.firebasestorage.app",
+            messagingSenderId: "1091097582321",
+            appId: "1:1091097582321:web:meteorbase"
+        };
+
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+        } catch (e) {
+            console.warn("Firebase Init notice:", e);
+        }
+
+        function switchAuthTab(mode) {
+            isSignUpMode = (mode === 'signup');
+            const signinBtn = document.getElementById('tab-signin');
+            const signupBtn = document.getElementById('tab-signup');
+            const title = document.getElementById('auth-title');
+            const subtitle = document.getElementById('auth-subtitle');
+            const btnText = document.getElementById('btn-text');
+            const nameGroup = document.getElementById('name-group');
+            const errorBox = document.getElementById('auth-error');
+
+            errorBox.classList.add('hidden');
+
+            if (isSignUpMode) {
+                signupBtn.className = "flex-1 py-2 text-xs font-semibold rounded-lg transition-all text-white bg-white/10 shadow";
+                signinBtn.className = "flex-1 py-2 text-xs font-semibold rounded-lg transition-all text-gray-400 hover:text-white";
+                title.textContent = "Create your free account";
+                subtitle.textContent = "Start monitoring API health and configuring retention policies in seconds.";
+                btnText.textContent = "Create Account →";
+                nameGroup.classList.remove('hidden');
+            } else {
+                signinBtn.className = "flex-1 py-2 text-xs font-semibold rounded-lg transition-all text-white bg-white/10 shadow";
+                signupBtn.className = "flex-1 py-2 text-xs font-semibold rounded-lg transition-all text-gray-400 hover:text-white";
+                title.textContent = "Sign in to your account";
+                subtitle.textContent = "Access your live telemetry dashboard and manage API tokens.";
+                btnText.textContent = "Sign In →";
+                nameGroup.classList.add('hidden');
+            }
+        }
+
+        function togglePasswordVis() {
+            const pwd = document.getElementById('auth-password');
+            pwd.type = pwd.type === 'password' ? 'text' : 'password';
+        }
+
+        async function handleGoogleSignIn() {
+            const errorBox = document.getElementById('auth-error');
+            errorBox.classList.add('hidden');
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await firebase.auth().signInWithPopup(provider);
+                window.location.href = "/";
+            } catch (err) {
+                errorBox.textContent = err.message || "Google sign-in error";
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+        async function handleGithubSignIn() {
+            const errorBox = document.getElementById('auth-error');
+            errorBox.classList.add('hidden');
+            try {
+                const provider = new firebase.auth.GithubAuthProvider();
+                await firebase.auth().signInWithPopup(provider);
+                window.location.href = "/";
+            } catch (err) {
+                errorBox.textContent = err.message || "GitHub sign-in error";
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+        async function handleAuthSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const name = document.getElementById('auth-name').value;
+            const errorBox = document.getElementById('auth-error');
+            const spinner = document.getElementById('auth-spinner');
+            const submitBtn = document.getElementById('auth-submit-btn');
+
+            errorBox.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                if (isSignUpMode) {
+                    const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                    if (name && cred.user) {
+                        await cred.user.updateProfile({ displayName: name });
+                    }
+                } else {
+                    await firebase.auth().signInWithEmailAndPassword(email, password);
+                }
+                window.location.href = "/";
+            } catch (err) {
+                errorBox.textContent = err.message || "Authentication failed";
+                errorBox.classList.remove('hidden');
+            } finally {
+                spinner.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        }
+
+        async function handlePasswordReset(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            if (!email) {
+                alert("Please enter your email address in the field first.");
+                return;
+            }
+            try {
+                await firebase.auth().sendPasswordResetEmail(email);
+                alert("Password reset email sent to " + email);
+            } catch (err) {
+                alert("Error sending password reset: " + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
